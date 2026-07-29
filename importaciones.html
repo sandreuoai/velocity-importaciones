@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Velocity Savage — Importaciones</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+:root{--bg:#0d0d0d;--surface:#181818;--surface2:#222;--border:rgba(255,255,255,.07);--border-strong:rgba(255,255,255,.14);
+--text:#f0f0f0;--muted:#777;--red:#DD1616;--green:#22c55e;--amber:#f59e0b;--blue:#2a78d6;--radius:10px;
+--font:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14px;min-height:100vh}
+#login{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:100}
+.login-card{background:var(--surface);border:1px solid var(--border-strong);border-radius:16px;padding:40px;width:360px;text-align:center}
+.login-card h1{font-size:20px;margin-bottom:6px}
+.login-card p{color:var(--muted);font-size:13px;margin-bottom:24px}
+.login-card input{width:100%;padding:10px 14px;background:var(--surface2);border:1px solid var(--border-strong);border-radius:var(--radius);color:var(--text);font-size:14px;margin-bottom:10px;outline:none}
+.login-card input:focus{border-color:var(--red)}
+.btn-primary{width:100%;padding:11px;background:var(--red);color:#fff;border:none;border-radius:var(--radius);font-size:14px;font-weight:600;cursor:pointer}
+.btn-primary:hover{opacity:.88}
+.err{color:#f87171;font-size:12px;margin-top:8px}
+#app{display:none}
+header{background:var(--surface);border-bottom:1px solid var(--border);padding:0 24px;height:52px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:10}
+.logo{font-size:15px;font-weight:700}.logo span{color:var(--red)}
+.btn-logout{background:none;border:1px solid var(--border-strong);color:var(--muted);border-radius:8px;padding:5px 12px;font-size:12px;cursor:pointer}
+main{padding:20px 24px;max-width:1300px;margin:0 auto}
+.tabs{display:flex;gap:4px;margin-bottom:20px;border-bottom:1px solid var(--border);flex-wrap:wrap}
+.tab{padding:8px 18px;border-radius:8px 8px 0 0;border:none;background:none;color:var(--muted);font-size:13px;cursor:pointer;margin-bottom:-1px;border-bottom:2px solid transparent}
+.tab.active{color:var(--text);font-weight:500;border-bottom:2px solid var(--red)}
+.tab:hover:not(.active){color:var(--text)}
+.page{display:none}.page.active{display:block}
+.filtros{display:flex;align-items:center;gap:10px;margin-bottom:20px;flex-wrap:wrap}
+.filtros label{font-size:12px;color:var(--muted)}
+.fi{background:var(--surface);border:1px solid var(--border-strong);color:var(--text);border-radius:8px;padding:6px 10px;font-size:13px;outline:none}
+.fi:focus{border-color:var(--red)}
+.btn-f{padding:6px 14px;background:var(--red);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer}
+.btn-fs{padding:6px 14px;background:none;color:var(--muted);border:1px solid var(--border-strong);border-radius:8px;font-size:12px;cursor:pointer}
+.btn-fs:hover{color:var(--text)}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(175px,1fr));gap:10px;margin-bottom:18px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px}
+.card .lbl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px}
+.card .val{font-size:20px;font-weight:600;letter-spacing:-.5px}
+.card .val.green{color:var(--green)}.card .val.amber{color:var(--amber)}.card .val.red{color:#f87171}
+.card .sub{font-size:11px;color:var(--muted);margin-top:3px}
+.card .sub.warn{color:var(--amber)}
+.chart-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px;margin-bottom:18px}
+.ct{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:14px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:18px}
+@media(max-width:900px){.row2{grid-template-columns:1fr}}
+.rk{list-style:none}
+.rki{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)}
+.rki:last-child{border-bottom:none}
+.rkn{font-size:11px;color:var(--muted);width:18px;text-align:right;flex-shrink:0}
+.rkname{flex:1;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rkv{font-size:12px;color:var(--muted);text-align:right;flex-shrink:0}
+.rkbw{width:60px;flex-shrink:0}.rkb{height:4px;background:var(--red);border-radius:2px}
+.hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px}
+.hdr .t{font-size:13px;font-weight:600}
+.pedido{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;margin-bottom:10px}
+.pedido.pend{border-left:3px solid var(--amber)}
+.pedido.listo{border-left:3px solid var(--green)}
+.ptop{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:10px}
+.pprod{font-size:14px;font-weight:600;line-height:1.35}
+.pmeta{font-size:12px;color:var(--muted);margin-top:3px}
+.pmoney{text-align:right;font-size:12px;color:var(--muted);white-space:nowrap}
+.pmoney b{color:var(--text);font-size:14px;display:block}
+.pctrl{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding-top:10px;border-top:1px solid var(--border)}
+.sel{background:var(--surface2);border:1px solid var(--border-strong);color:var(--text);border-radius:8px;padding:6px 10px;font-size:12px;outline:none;cursor:pointer}
+.obs{flex:1;min-width:180px;background:var(--surface2);border:1px solid var(--border-strong);color:var(--text);border-radius:8px;padding:6px 10px;font-size:12px;outline:none}
+.chk{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);cursor:pointer;user-select:none;white-space:nowrap}
+.chk input{width:15px;height:15px;accent-color:var(--amber);cursor:pointer}
+.btn-wa{background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.3);color:#4ade80;border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer;text-decoration:none;white-space:nowrap}
+.btn-wa:hover{background:rgba(34,197,94,.2)}
+.btn-ok{background:var(--green);border:none;color:#062;border-radius:8px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap}
+.btn-ok:hover{opacity:.88}
+.btn-ok:disabled{opacity:.5;cursor:not-allowed}
+.chip{font-size:10px;font-weight:600;padding:2px 8px;border-radius:4px;display:inline-block;margin-left:6px}
+.chip-pend{background:rgba(245,158,11,.12);color:#fbbf24;border:1px solid rgba(245,158,11,.28)}
+.chip-ok{background:rgba(34,197,94,.12);color:#4ade80;border:1px solid rgba(34,197,94,.25)}
+.chip-pacho{background:rgba(192,132,252,.12);color:#c084fc;border:1px solid rgba(192,132,252,.28)}
+.vacio{text-align:center;padding:50px 20px;color:var(--muted)}
+.vacio .big{font-size:34px;margin-bottom:10px}
+.loading{color:var(--muted);font-size:13px;padding:40px 0;text-align:center}
+.aviso{background:rgba(245,158,11,.07);border:1px solid rgba(245,158,11,.25);border-radius:var(--radius);padding:11px 14px;font-size:12px;color:#fbbf24;margin-bottom:14px;line-height:1.5}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--surface);border:1px solid var(--border-strong);border-radius:10px;padding:12px 20px;font-size:13px;z-index:200;display:none;box-shadow:0 8px 24px rgba(0,0,0,.5)}
+.toast.ok{border-color:rgba(34,197,94,.4);color:#4ade80}
+.toast.err{border-color:rgba(248,113,113,.4);color:#f87171}
+.search{background:var(--surface);border:1px solid var(--border-strong);color:var(--text);border-radius:8px;padding:6px 11px;font-size:13px;outline:none;width:220px}
+</style>
+</head>
+<body>
+<div id="login">
+  <div class="login-card">
+    <h1>Velocity <span style="color:var(--red)">Savage</span></h1>
+    <p>Gestión de importaciones</p>
+    <input type="text" id="u" placeholder="Usuario" onkeydown="if(event.key==='Enter')entrar()"/>
+    <input type="password" id="p" placeholder="Contraseña" onkeydown="if(event.key==='Enter')entrar()"/>
+    <button class="btn-primary" onclick="entrar()">Entrar</button>
+    <div class="err" id="lerr"></div>
+  </div>
+</div>
+
+<div id="app">
+  <header>
+    <div class="logo">Velocity <span>Savage</span> · Importaciones</div>
+    <button class="btn-logout" onclick="salir()">Salir</button>
+  </header>
+  <main>
+    <div class="tabs">
+      <button class="tab active" onclick="ir('cola',this)">Mis pedidos</button>
+      <button class="tab" onclick="ir('pacho',this)">Pacho</button>
+      <button class="tab" onclick="ir('ventas',this)">Ventas</button>
+    </div>
+
+    <div class="page active" id="pg-cola">
+      <div class="cards" id="c-cola"><div class="loading">Cargando...</div></div>
+      <div class="hdr">
+        <span class="t" id="cola-n">Pedidos pendientes</span>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <input type="text" class="search" id="q" placeholder="Buscar cliente o producto..." oninput="pintarCola()"/>
+          <button class="btn-fs" id="b-pend" onclick="togglePend()">Solo sin costo</button>
+          <button class="btn-fs" onclick="cargarCola()">Actualizar</button>
+        </div>
+      </div>
+      <div id="lista"><div class="loading">Cargando...</div></div>
+    </div>
+
+    <div class="page" id="pg-pacho">
+      <div class="cards" id="c-pacho"><div class="loading">Cargando...</div></div>
+      <div class="chart-card">
+        <div class="ct">Pedidos gestionados con Pacho, por mes</div>
+        <div style="position:relative;height:220px"><canvas id="ch-pacho"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="ct">Detalle por mes</div>
+        <ul class="rk" id="rk-pacho"><li class="loading" style="padding:20px 0">Cargando...</li></ul>
+      </div>
+    </div>
+
+    <div class="page" id="pg-ventas">
+      <div class="filtros">
+        <label>Desde</label><input type="date" class="fi" id="d1"/>
+        <label>Hasta</label><input type="date" class="fi" id="d2"/>
+        <button class="btn-f" onclick="cargarVentas()">Aplicar</button>
+        <button class="btn-fs" onclick="rangoMes(0)">Este mes</button>
+        <button class="btn-fs" onclick="rangoMes(-1)">Mes anterior</button>
+        <button class="btn-fs" onclick="rangoAno()">Este año</button>
+      </div>
+      <div class="cards" id="c-ventas"><div class="loading">Cargando...</div></div>
+      <div class="chart-card">
+        <div class="ct">Ventas por día</div>
+        <div style="position:relative;height:200px"><canvas id="ch-dias"></canvas></div>
+      </div>
+      <div class="row2">
+        <div class="chart-card" style="margin:0">
+          <div class="ct">Canal de venta</div>
+          <div style="position:relative;height:200px"><canvas id="ch-canal"></canvas></div>
+        </div>
+        <div class="chart-card" style="margin:0">
+          <div class="ct">Importación vs nacional</div>
+          <ul class="rk" id="rk-tipo"><li class="loading" style="padding:20px 0">Cargando...</li></ul>
+        </div>
+      </div>
+      <div class="chart-card">
+        <div class="ct">Ciudades con más pedidos</div>
+        <ul class="rk" id="rk-ciudad"><li class="loading" style="padding:20px 0">Cargando...</li></ul>
+      </div>
+    </div>
+  </main>
+</div>
+<div class="toast" id="toast"></div>
+<script>
+// ============================================================
+// CONFIG — pega aquí la URL de la implementación del proyecto
+// "Panel importaciones" (NO la del panel de Andreu)
+const API = 'https://script.google.com/macros/s/AKfycbzUL4cY9ZefOLfXfSgaNxgvl3xpIarZgktKqAxn5Cyi6ATd2a46vCLeP51itaIn6xM6/exec';
+
+let U='', P='';                 // credenciales de la sesión
+let pedidos=[], soloPend=false, ch={}, cargando=false;
+
+const $ = id => document.getElementById(id);
+const cop = v => '$' + Math.round(v||0).toLocaleString('es-CO');
+const esc = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+const MES=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+function fFecha(iso){ if(!iso) return '—'; const [y,m,d]=iso.split('-'); return `${parseInt(d)} ${MES[parseInt(m)-1]}`; }
+function hoy(){ return new Date().toISOString().split('T')[0]; }
+function diaMes(o=0){ const d=new Date(); d.setDate(1); d.setMonth(d.getMonth()+o); return d.toISOString().split('T')[0]; }
+function finMes(o=0){ const d=new Date(); d.setDate(1); d.setMonth(d.getMonth()+o+1); d.setDate(0); return d.toISOString().split('T')[0]; }
+function destroy(k){ if(ch[k]){ ch[k].destroy(); delete ch[k]; } }
+
+function toast(msg, tipo){
+  const t=$('toast'); t.textContent=msg; t.className='toast '+(tipo||'ok'); t.style.display='block';
+  clearTimeout(t._h); t._h=setTimeout(()=>t.style.display='none', 3200);
+}
+
+async function get(params){
+  const url=new URL(API);
+  Object.entries(params).forEach(([k,v])=>url.searchParams.set(k,v));
+  url.searchParams.set('u',U); url.searchParams.set('p',P);
+  const r=await fetch(url.toString()); return r.json();
+}
+async function post(body){
+  const r=await fetch(API,{method:'POST',body:JSON.stringify({...body,u:U,p:P}),
+    headers:{'Content-Type':'text/plain'},redirect:'follow'});
+  return r.json();
+}
+
+// ============================================================
+// LOGIN — se valida contra el servidor, no contra el HTML
+async function entrar(){
+  const u=$('u').value.trim(), p=$('p').value;
+  if(!u||!p){ $('lerr').textContent='Escribe usuario y contraseña'; return; }
+  $('lerr').textContent='Verificando...';
+  U=u; P=p;
+  try{
+    const r=await post({action:'login'});
+    if(r.error){ $('lerr').textContent=r.error; U=P=''; return; }
+    $('login').style.display='none'; $('app').style.display='block';
+    cargarCola(); 
+  }catch(e){ $('lerr').textContent='No se pudo conectar. Revisa tu internet.'; U=P=''; }
+}
+function salir(){ U=P=''; $('app').style.display='none'; $('login').style.display='flex'; $('p').value=''; }
+
+function ir(pg,btn){
+  document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+  $('pg-'+pg).classList.add('active'); btn.classList.add('active');
+  if(pg==='pacho') cargarPacho();
+  if(pg==='ventas' && !$('d1').value){ rangoMes(0); }
+}
+
+// ============================================================
+// COLA DE PEDIDOS
+async function cargarCola(){
+  $('lista').innerHTML='<div class="loading">Cargando...</div>';
+  try{
+    const r=await get({action:'cola'});
+    if(r.error){ $('lista').innerHTML=`<div class="vacio">${esc(r.error)}</div>`; return; }
+    pedidos=r.pedidos||[];
+    $('c-cola').innerHTML=`
+      <div class="card"><div class="lbl">Pedidos abiertos</div><div class="val">${pedidos.length}</div><div class="sub">Sin entregar</div></div>
+      <div class="card"><div class="lbl">Sin costo cargado</div><div class="val ${r.sinLiquidar?'amber':'green'}">${r.sinLiquidar}</div><div class="sub">${r.sinLiquidar?'Falta precio de compra':'Todo liquidado'}</div></div>
+      <div class="card"><div class="lbl">Ya llegaron</div><div class="val green">${pedidos.filter(x=>x.estado==='LLEGO').length}</div><div class="sub">Listos para entregar</div></div>
+      <div class="card"><div class="lbl">En tránsito</div><div class="val">${pedidos.filter(x=>x.estado==='TRANSITO').length}</div><div class="sub">Vienen de China</div></div>
+      <div class="card"><div class="lbl">Con Pacho</div><div class="val" style="color:#c084fc">${pedidos.filter(x=>x.usaPacho).length}</div><div class="sub">De los pedidos abiertos</div></div>`;
+    pintarCola();
+  }catch(e){ $('lista').innerHTML='<div class="vacio">Error de conexión</div>'; }
+}
+
+function togglePend(){
+  soloPend=!soloPend;
+  const b=$('b-pend');
+  b.style.background=soloPend?'var(--amber)':'none';
+  b.style.color=soloPend?'#000':'var(--muted)';
+  pintarCola();
+}
+
+function pintarCola(){
+  const q=($('q').value||'').toLowerCase();
+  let l=pedidos;
+  if(q) l=l.filter(x=>(x.persona||'').toLowerCase().includes(q)||(x.producto||'').toLowerCase().includes(q)||(x.numero||'').includes(q));
+  if(soloPend) l=l.filter(x=>!x.liquidado);
+  $('cola-n').textContent=`Pedidos pendientes (${l.length})`;
+
+  if(!l.length){
+    $('lista').innerHTML=`<div class="vacio"><div class="big">✅</div><div>${pedidos.length?'Ningún pedido coincide con el filtro.':'No hay pedidos pendientes. Todo entregado.'}</div></div>`;
+    return;
+  }
+
+  $('lista').innerHTML=l.map(x=>{
+    const i=pedidos.indexOf(x);
+    const wa=x.numero?`https://wa.me/57${x.numero.replace(/^57/,'')}`:null;
+    return `<div class="pedido ${x.liquidado?'listo':'pend'}">
+      <div class="ptop">
+        <div style="flex:1;min-width:220px">
+          <div class="pprod">${esc(x.producto||'(sin producto)')}
+            ${!x.liquidado?'<span class="chip chip-pend">sin costo</span>':''}
+            ${x.usaPacho?'<span class="chip chip-pacho">Pacho</span>':''}
+          </div>
+          <div class="pmeta">${esc(x.persona||'—')} · ${fFecha(x.fecha)}${x.numero?' · '+esc(x.numero):''}</div>
+        </div>
+        <div class="pmoney">
+          <b>${cop(x.venta)}</b>
+          ${x.liquidado?`costo ${cop(x.compra)} · envío ${cop(x.envio)}`:'costo pendiente'}
+        </div>
+      </div>
+      <div class="pctrl">
+        <select class="sel" onchange="cambiarEstado(${i},this.value)">
+          <option value="PEDIDO"${x.estado==='PEDIDO'?' selected':''}>Pedido a China</option>
+          <option value="TRANSITO"${x.estado==='TRANSITO'?' selected':''}>En tránsito</option>
+          <option value="LLEGO"${x.estado==='LLEGO'?' selected':''}>Ya llegó</option>
+        </select>
+        <label class="chk"><input type="checkbox" ${x.usaPacho?'checked':''} onchange="cambiarPacho(${i},this.checked)"> Usé a Pacho</label>
+        <input class="obs" placeholder="Observación..." value="${esc(x.obs||'')}" onchange="cambiarObs(${i},this.value)">
+        ${wa?`<a class="btn-wa" href="${wa}" target="_blank" rel="noopener">WhatsApp</a>`:''}
+        <button class="btn-ok" onclick="entregar(${i})">Entregado</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function guardar(i,campos,msg){
+  if(cargando) return;
+  const x=pedidos[i]; if(!x) return;
+  cargando=true;
+  try{
+    const r=await post({action:'actualizar',fila:x.fila,numero:x.numero,...campos});
+    if(r.error){ toast(r.error,'err'); await cargarCola(); return; }
+    Object.assign(x,campos);
+    toast(msg||'Guardado');
+  }catch(e){ toast('No se pudo guardar. Revisa tu internet.','err'); }
+  finally{ cargando=false; }
+}
+function cambiarEstado(i,v){ guardar(i,{estado:v},'Estado actualizado'); pedidos[i].estado=v; }
+function cambiarObs(i,v){ guardar(i,{obs:v},'Observación guardada'); }
+function cambiarPacho(i,v){
+  guardar(i,{usaPacho:v},v?'Marcado con Pacho':'Pacho quitado');
+  pedidos[i].usaPacho=v; pedidos[i].pacho=v?15000:0;
+}
+
+async function entregar(i){
+  const x=pedidos[i]; if(!x||cargando) return;
+  if(!confirm(`¿Marcar como ENTREGADO?\n\n${x.producto}\n${x.persona}\n\nSale de tu lista, pero queda guardado en el histórico.`)) return;
+  cargando=true;
+  try{
+    const r=await post({action:'entregar',fila:x.fila,numero:x.numero});
+    if(r.error){ toast(r.error,'err'); }
+    else toast('Entregado ✓');
+  }catch(e){ toast('No se pudo guardar','err'); }
+  finally{ cargando=false; await cargarCola(); }
+}
+
+// ============================================================
+// PACHO
+async function cargarPacho(){
+  try{
+    const r=await get({action:'pacho'});
+    if(r.error){ $('c-pacho').innerHTML=`<div class="loading">${esc(r.error)}</div>`; return; }
+    const m=r.meses||[];
+    const act=m.length?m[m.length-1]:null, ant=m.length>1?m[m.length-2]:null;
+    let tend='—', clase='';
+    if(act&&ant){
+      const d=act.pedidos-ant.pedidos;
+      tend = d<0 ? `▼ ${Math.abs(d)} menos que el mes pasado` : d>0 ? `▲ ${d} más que el mes pasado` : 'igual que el mes pasado';
+      clase = d<0?'green':d>0?'amber':'';
+    }
+    $('c-pacho').innerHTML=`
+      <div class="card"><div class="lbl">Saldo con Pacho</div><div class="val ${r.saldo>0?'amber':'green'}">${cop(r.saldo)}</div><div class="sub">${r.pedidosPendientes} pedidos sin pagar</div></div>
+      <div class="card"><div class="lbl">Este mes</div><div class="val">${act?act.pedidos:0}</div><div class="sub ${clase==='green'?'':'warn'}" style="${clase==='green'?'color:var(--green)':''}">${tend}</div></div>
+      <div class="card"><div class="lbl">Pagado histórico</div><div class="val">${cop(r.totalHistorico)}</div><div class="sub">${r.pedidosTotal} pedidos en total</div></div>
+      <div class="card"><div class="lbl">Tarifa</div><div class="val">${cop(r.valorPacho)}</div><div class="sub">Por pedido gestionado</div></div>`;
+
+    destroy('pacho');
+    ch.pacho=new Chart($('ch-pacho'),{type:'bar',
+      data:{labels:m.map(x=>{const[y,mm]=x.mes.split('-');return MES[parseInt(mm)-1]+' '+y.slice(2)}),
+        datasets:[{label:'Pedidos',data:m.map(x=>x.pedidos),backgroundColor:'#c084fc',borderRadius:4,borderSkipped:false}]},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+        scales:{x:{grid:{color:'rgba(255,255,255,.04)'},ticks:{color:'#aaa',font:{size:11}}},
+          y:{grid:{color:'rgba(255,255,255,.04)'},ticks:{color:'#666',font:{size:10},precision:0}}}}});
+
+    const max=Math.max(...m.map(x=>x.valor),1);
+    $('rk-pacho').innerHTML = m.length ? m.slice().reverse().map(x=>{
+      const[y,mm]=x.mes.split('-');
+      return `<li class="rki"><span class="rkn"></span>
+        <span class="rkname">${MES[parseInt(mm)-1]} ${y} <span style="color:var(--muted);font-size:11px">${x.pedidos} pedidos</span></span>
+        <div class="rkbw"><div class="rkb" style="width:${Math.round(x.valor/max*100)}%;background:#c084fc"></div></div>
+        <span class="rkv">${cop(x.valor)}</span></li>`;}).join('')
+      : '<li style="padding:16px 0;color:var(--muted);font-size:12px;text-align:center">Todavía no has usado a Pacho</li>';
+  }catch(e){ $('c-pacho').innerHTML='<div class="loading">Error de conexión</div>'; }
+}
+
+// ============================================================
+// VENTAS (solo lectura, agregados)
+function rangoMes(o){ $('d1').value=diaMes(o); $('d2').value=o===0?hoy():finMes(o); cargarVentas(); }
+function rangoAno(){ $('d1').value=new Date().getFullYear()+'-01-01'; $('d2').value=hoy(); cargarVentas(); }
+
+async function cargarVentas(){
+  const desde=$('d1').value, hasta=$('d2').value;
+  if(!desde||!hasta) return;
+  $('c-ventas').innerHTML='<div class="loading">Cargando...</div>';
+  try{
+    const r=await get({action:'resumen',desde,hasta});
+    if(r.error){ $('c-ventas').innerHTML=`<div class="loading">${esc(r.error)}</div>`; return; }
+    const imp=(r.tipos||[]).find(t=>t.tipo==='SI');
+    const pctImp=r.totalVentas?Math.round((imp?imp.ventas:0)/r.totalVentas*100):0;
+    $('c-ventas').innerHTML=`
+      <div class="card"><div class="lbl">Ventas del período</div><div class="val">${cop(r.totalVentas)}</div></div>
+      <div class="card"><div class="lbl">Pedidos</div><div class="val">${r.ordenes}</div></div>
+      <div class="card"><div class="lbl">Ticket promedio</div><div class="val">${cop(r.ticket)}</div></div>
+      <div class="card"><div class="lbl">Importación</div><div class="val" style="color:#c084fc">${pctImp}%</div><div class="sub">${imp?imp.ordenes+' pedidos · '+cop(imp.ventas):'sin marcar'}</div></div>`;
+
+    destroy('dias');
+    const d=r.dias||[];
+    ch.dias=new Chart($('ch-dias'),{type:'bar',
+      data:{labels:d.map(x=>fFecha(x.dia)),datasets:[{data:d.map(x=>x.ventas),backgroundColor:'#DD1616',borderRadius:3,borderSkipped:false}]},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+        scales:{x:{grid:{color:'rgba(255,255,255,.04)'},ticks:{color:'#666',font:{size:10},maxTicksLimit:15,maxRotation:45}},
+          y:{grid:{color:'rgba(255,255,255,.04)'},ticks:{color:'#666',font:{size:10},callback:v=>v>=1e6?'$'+(v/1e6).toFixed(1)+'M':'$'+(v/1000).toFixed(0)+'k'}}}}});
+
+    destroy('canal');
+    const cs=r.canales||[], pal=['#DD1616','#2a78d6','#22c55e','#eda100','#888','#c084fc'];
+    ch.canal=new Chart($('ch-canal'),{type:'doughnut',
+      data:{labels:cs.map(x=>x.canal),datasets:[{data:cs.map(x=>x.ordenes),backgroundColor:cs.map((_,i)=>pal[i%pal.length]),borderWidth:0}]},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{color:'#666',font:{size:11},boxWidth:10,padding:10}}}}});
+
+    const et={'SI':'Importación','NO':'Nacional'};
+    rank('rk-tipo',(r.tipos||[]),x=>et[x.tipo]||x.tipo,x=>`${x.ordenes} · ${cop(x.ventas)}`,x=>x.ventas,'#c084fc');
+    rank('rk-ciudad',(r.ciudades||[]),x=>x.ciudad,x=>`${x.ordenes} pedidos`,x=>x.ordenes,'#22c55e');
+  }catch(e){ $('c-ventas').innerHTML='<div class="loading">Error de conexión</div>'; }
+}
+
+function rank(el,items,nf,vf,sf,color){
+  const n=$(el);
+  if(!items.length){ n.innerHTML='<li style="padding:16px 0;color:var(--muted);font-size:12px;text-align:center">Sin datos</li>'; return; }
+  const max=Math.max(...items.map(sf),1);
+  n.innerHTML=items.slice(0,10).map((x,i)=>`<li class="rki">
+    <span class="rkn">${i+1}</span>
+    <span class="rkname" title="${esc(nf(x))}">${esc(nf(x))}</span>
+    <div class="rkbw"><div class="rkb" style="width:${Math.round(sf(x)/max*100)}%;background:${color}"></div></div>
+    <span class="rkv">${esc(vf(x))}</span></li>`).join('');
+}
+</script>
+</body>
+</html>
