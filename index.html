@@ -110,6 +110,7 @@ main{padding:20px 24px;max-width:1300px;margin:0 auto}
     <div class="tabs">
       <button class="tab active" onclick="ir('cola',this)">Mis pedidos</button>
       <button class="tab" onclick="ir('pacho',this)">Pacho</button>
+      <button class="tab" onclick="ir('deuda',this)">Deuda</button>
       <button class="tab" onclick="ir('ventas',this)">Ventas</button>
     </div>
 
@@ -135,6 +136,21 @@ main{padding:20px 24px;max-width:1300px;margin:0 auto}
       <div class="chart-card">
         <div class="ct">Detalle por mes</div>
         <ul class="rk" id="rk-pacho"><li class="loading" style="padding:20px 0">Cargando...</li></ul>
+      </div>
+    </div>
+
+    <div class="page" id="pg-deuda">
+      <div class="cards" id="c-deuda"><div class="loading">Cargando...</div></div>
+      <div id="aviso-deuda"></div>
+      <div class="row2">
+        <div class="chart-card" style="margin:0">
+          <div class="ct">Costo por mes</div>
+          <ul class="rk" id="rk-meses"><li class="loading" style="padding:20px 0">Cargando...</li></ul>
+        </div>
+        <div class="chart-card" style="margin:0">
+          <div class="ct">Abonos recibidos</div>
+          <ul class="rk" id="rk-abonos"><li class="loading" style="padding:20px 0">Cargando...</li></ul>
+        </div>
       </div>
     </div>
 
@@ -227,6 +243,7 @@ function ir(pg,btn){
   document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
   $('pg-'+pg).classList.add('active'); btn.classList.add('active');
   if(pg==='pacho') cargarPacho();
+  if(pg==='deuda') cargarDeuda();
   if(pg==='ventas' && !$('d1').value){ rangoMes(0); }
 }
 
@@ -368,6 +385,41 @@ async function cargarPacho(){
         <span class="rkv">${cop(x.valor)}</span></li>`;}).join('')
       : '<li style="padding:16px 0;color:var(--muted);font-size:12px;text-align:center">Todavía no has usado a Pacho</li>';
   }catch(e){ $('c-pacho').innerHTML='<div class="loading">Error de conexión</div>'; }
+}
+
+// ============================================================
+// DEUDA OPERACIONAL
+async function cargarDeuda(){
+  try{
+    const r=await get({action:'deuda'});
+    if(r.error){ $('c-deuda').innerHTML=`<div class="loading">${esc(r.error)}</div>`; return; }
+    $('c-deuda').innerHTML=`
+      <div class="card" style="border-color:rgba(221,22,22,.4)"><div class="lbl">💰 Saldo actual</div><div class="val ${r.saldo>0?'red':'green'}">${cop(r.saldo)}</div><div class="sub">Lo que se te debe hoy</div></div>
+      <div class="card"><div class="lbl">Costo puesto</div><div class="val">${cop(r.causada)}</div><div class="sub">${r.liquidadas} pedidos liquidados</div></div>
+      <div class="card"><div class="lbl">Abonos recibidos</div><div class="val green">${cop(r.abonos)}</div><div class="sub">${r.listaAbonos.length} pagos</div></div>
+      <div class="card"><div class="lbl">Sin costo cargado</div><div class="val ${r.pendientes?'amber':'green'}">${r.pendientes}</div><div class="sub">${r.pendientes?'Faltan por liquidar':'Todo al día'}</div></div>
+      <div class="card"><div class="lbl">Por sumar al saldo</div><div class="val ${r.porLlegar?'amber':'green'}">${cop(r.porLlegar)}</div><div class="sub">Estimado, a ${cop(r.promedio)} por pedido</div></div>`;
+
+    $('aviso-deuda').innerHTML = r.pendientes
+      ? `<div class="aviso">Tienes <b>${r.pendientes} pedidos sin costo cargado</b> (${cop(r.ventaPendiente)} vendidos). Mientras no les pongas precio de compra y envío, ese costo no aparece en tu saldo. Al cargarlos, el saldo sube unos <b>${cop(r.porLlegar)}</b>.</div>`
+      : '';
+
+    const mx=Math.max(...(r.meses||[]).map(m=>m.costo),1);
+    $('rk-meses').innerHTML=(r.meses||[]).length ? r.meses.slice().reverse().map(m=>{
+      const[y,mm]=m.mes.split('-');
+      return `<li class="rki"><span class="rkn"></span>
+        <span class="rkname">${MES[parseInt(mm)-1]} ${y} <span style="color:var(--muted);font-size:11px">${m.pendientes?m.pendientes+' sin cargar':'completo'}</span></span>
+        <div class="rkbw"><div class="rkb" style="width:${Math.round(m.costo/mx*100)}%"></div></div>
+        <span class="rkv">${cop(m.costo)}</span></li>`;}).join('')
+      : '<li style="padding:16px 0;color:var(--muted);font-size:12px;text-align:center">Sin datos</li>';
+
+    const ma=Math.max(...(r.listaAbonos||[]).map(a=>a.valor),1);
+    $('rk-abonos').innerHTML=(r.listaAbonos||[]).length ? r.listaAbonos.map(a=>
+      `<li class="rki"><span class="rkn"></span><span class="rkname">${fFecha(a.fecha)}</span>
+        <div class="rkbw"><div class="rkb" style="width:${Math.round(a.valor/ma*100)}%;background:#22c55e"></div></div>
+        <span class="rkv" style="color:var(--green)">${cop(a.valor)}</span></li>`).join('')
+      : '<li style="padding:16px 0;color:var(--muted);font-size:12px;text-align:center">Sin abonos todavía</li>';
+  }catch(e){ $('c-deuda').innerHTML='<div class="loading">Error de conexión</div>'; }
 }
 
 // ============================================================
