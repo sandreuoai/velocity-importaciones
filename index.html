@@ -394,11 +394,10 @@ async function cargarDeuda(){
     const r=await get({action:'deuda'});
     if(r.error){ $('c-deuda').innerHTML=`<div class="loading">${esc(r.error)}</div>`; return; }
     $('c-deuda').innerHTML=`
-      <div class="card" style="border-color:rgba(221,22,22,.4)"><div class="lbl">💰 Saldo actual</div><div class="val ${r.saldo>0?'red':'green'}">${cop(r.saldo)}</div><div class="sub">Lo que se te debe hoy</div></div>
-      <div class="card"><div class="lbl">Costo puesto</div><div class="val">${cop(r.causada)}</div><div class="sub">${r.liquidadas} pedidos liquidados</div></div>
-      <div class="card"><div class="lbl">Abonos recibidos</div><div class="val green">${cop(r.abonos)}</div><div class="sub">${r.listaAbonos.length} pagos</div></div>
-      <div class="card"><div class="lbl">Sin costo cargado</div><div class="val ${r.pendientes?'amber':'green'}">${r.pendientes}</div><div class="sub">${r.pendientes?'Faltan por liquidar':'Todo al día'}</div></div>
-      <div class="card"><div class="lbl">Por sumar al saldo</div><div class="val ${r.porLlegar?'amber':'green'}">${cop(r.porLlegar)}</div><div class="sub">Estimado, a ${cop(r.promedio)} por pedido</div></div>`;
+      <div class="card" style="border-color:rgba(221,22,22,.4)"><div class="lbl">💰 Saldo a tu favor</div><div class="val ${r.saldo>0?'red':'green'}">${cop(r.saldo)}</div><div class="sub">Lo que Velocity te debe hoy</div></div>
+      <div class="card"><div class="lbl">Costo que has puesto</div><div class="val">${cop(r.causada)}</div><div class="sub">${r.liquidadas} pedidos ya liquidados</div></div>
+      <div class="card"><div class="lbl">Abonos que has recibido</div><div class="val green">${cop(r.abonos)}</div><div class="sub">${r.listaAbonos.length} abonos</div></div>
+      <div class="card"><div class="lbl">Por liquidar</div><div class="val ${r.pendientes?'amber':'green'}">${r.pendientes}</div><div class="sub">${r.pendientes?'Pedidos sin costo cargado: el saldo va a subir':'Todo liquidado'}</div></div>`;
 
     $('aviso-deuda').innerHTML = r.pendientes
       ? `<div class="aviso">Tienes <b>${r.pendientes} pedidos sin costo cargado</b> (${cop(r.ventaPendiente)} vendidos). Mientras no les pongas precio de compra y envío, ese costo no aparece en tu saldo. Al cargarlos, el saldo sube unos <b>${cop(r.porLlegar)}</b>.</div>`
