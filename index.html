@@ -189,7 +189,7 @@ main{padding:14px 16px 24px;max-width:1300px;margin:0 auto}
   body.imprimiendo{background:#fff}
   body.imprimiendo #app,body.imprimiendo #login,body.imprimiendo .toast{display:none!important}
   body.imprimiendo #hoja-impresion{display:block}
-  .hoja{width:215.9mm;height:279.4mm;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;page-break-after:always;break-after:page}
+  .hoja{width:215.9mm;height:279mm;padding:4mm;box-sizing:border-box;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;page-break-after:always;break-after:page}
   .hoja:last-child{page-break-after:auto;break-after:auto}
   .rotulo{border:1px dashed #888;padding:9mm 8mm;color:#000;font-family:Arial,Helvetica,sans-serif;overflow:hidden;display:flex;flex-direction:column;gap:3.2mm}
   .rotulo .marca{font-size:9pt;font-weight:700;letter-spacing:.5px;border-bottom:1.5px solid #000;padding-bottom:2mm}
@@ -267,7 +267,7 @@ main{padding:14px 16px 24px;max-width:1300px;margin:0 auto}
             <option value="15" selected>Últimos 15 días</option><option value="30">Últimos 30 días</option>
             <option value="90">Últimos 90 días</option>
           </select>
-          <button class="btn-fs" onclick="rotMarcarListos()">Marcar los por despachar</button>
+          <button class="btn-fs" onclick="rotMarcarListos()">Seleccionar todos los listos</button>
           <button class="btn-fs" onclick="rotDesmarcar()">Desmarcar</button>
           <button class="btn-fs" id="b-rot-desp" onclick="rotVerDespachados()">Ver despachados</button>
         </div>
@@ -654,7 +654,8 @@ function rotDesmarcar(){ rotSel=new Set(); pintarRotulos(); }
 function rotVerDespachados(){ rotVerDesp=!rotVerDesp; $('b-rot-desp').textContent=rotVerDesp?'Ocultar despachados':'Ver despachados'; pintarRotulos(); }
 function rotResumen(){
   const n=rotSel.size;
-  $('rot-resumen').textContent=n?`${n} marcado(s) · ${Math.ceil(n/4)} hoja(s) carta si los imprimes`:'Marca los pedidos con los que vas a trabajar';
+  const vac=(4-n%4)%4;
+  $('rot-resumen').innerHTML=n?`${n} marcado(s) · ${Math.ceil(n/4)} hoja(s) carta`+(vac?` · <b style="color:var(--amber)">la última hoja queda con ${vac} espacio(s) vacío(s)</b>`:' · hojas completas ✓'):'Marca los pedidos con los que vas a trabajar';
   $('rot-btn').disabled=!n;
 }
 
@@ -714,6 +715,9 @@ function rotImprimir(){
   if(!l.length) return;
   if(l.some(x=>x.estado==='EN CAMINO')){ toast('Hay importaciones que todavía no llegan. Márcalas «Ya llegó» o desmárcalas.','err'); return; }
   if(l.some(x=>rotFalta(x).length)){ toast('Hay rótulos con datos incompletos. Desmárcalos o corrígelos.','err'); return; }
+  const vac=(4-l.length%4)%4;
+  const aviso=`Vas a imprimir ${l.length} rótulo(s) en ${Math.ceil(l.length/4)} hoja(s) carta.`+(vac?`\n\nOJO: la última hoja saldrá con ${vac} espacio(s) vacío(s). ${l.length===1?'Si tienes más pedidos listos, márcalos para aprovechar la hoja.':'¿Seguro que no faltan pedidos por marcar?'}`:'')+`\n\nEn la ventana de impresión: tamaño Carta, escala 100% y márgenes «Ninguno».`;
+  if(!confirm(aviso)) return;
   const rep=l.filter(x=>x.impresiones>0);
   if(rep.length){
     const t=prompt(`${rep.length} de estos rótulos YA se imprimieron antes (${rep.map(x=>'#'+x.id).join(', ')}).\n\nPara imprimirlos otra vez escribe REIMPRIMIR:`);
