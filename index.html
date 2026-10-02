@@ -118,8 +118,13 @@ main{padding:14px 16px 24px;max-width:1300px;margin:0 auto}
 .rapidos::-webkit-scrollbar{display:none}
 .rapidos button{flex:none;min-height:36px;padding:0 14px;border-radius:18px;border:1px solid var(--border);background:none;color:var(--muted);font-size:13px;cursor:pointer}
 .rapidos button.on{color:var(--text);border-color:var(--border-strong);background:var(--surface2)}
-.aviso-costos{display:flex;align-items:center;justify-content:space-between;gap:12px;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.4);border-radius:var(--radius);padding:12px 14px;margin-bottom:12px;font-size:14px;color:#fbbf24;line-height:1.4}
-.aviso-costos button{flex:none;min-height:var(--toque);padding:0 16px;border:none;border-radius:10px;background:var(--amber);color:#000;font-size:14px;font-weight:700;cursor:pointer}
+.pend-d summary{cursor:pointer;min-height:36px;display:flex;align-items:center;list-style:none}.pend-d summary::-webkit-details-marker{display:none}
+.pend-t{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin:2px 0 8px}
+.pend{display:flex;flex-direction:column;gap:10px;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.35);border-radius:var(--radius);padding:12px 14px;margin-bottom:8px;font-size:14px;color:#fbbf24;line-height:1.45}
+.pend .bt{display:flex;gap:8px;flex-wrap:wrap}
+.pend button{min-height:var(--toque);padding:0 14px;border-radius:10px;font-size:14px;cursor:pointer;border:1px solid rgba(245,158,11,.5);background:none;color:#fbbf24}
+.pend button.go{background:var(--amber);color:#000;border-color:var(--amber);font-weight:700}
+.pend button.ok{border-color:rgba(34,197,94,.5);color:#4ade80}
 .tab .nbadge{display:inline-block;min-width:20px;padding:1px 6px;margin-left:6px;border-radius:10px;background:var(--amber);color:#000;font-size:12px;font-weight:700}
 .mas{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:6px}
 .mas summary{min-height:var(--toque);display:flex;align-items:center;padding:0 14px;font-size:14px;cursor:pointer;color:var(--text);list-style:none}
@@ -171,6 +176,8 @@ main{padding:14px 16px 24px;max-width:1300px;margin:0 auto}
   .btn-wa,.btn-ok{min-height:36px;font-size:12px}
   .fichas,.rapidos{margin:0 0 12px;padding:2px 0;flex-wrap:wrap;overflow:visible}
   .ficha{min-height:38px;font-size:13px}
+  .pend{flex-direction:row;align-items:center;justify-content:space-between}
+  .pend button{min-height:36px;font-size:13px}
   .fechas{max-width:420px}
   .mas-c .rapidos{margin:0 0 12px;padding:2px 0}
   #q{max-width:420px}
@@ -229,7 +236,7 @@ main{padding:14px 16px 24px;max-width:1300px;margin:0 auto}
     </div>
 
     <div class="page active" id="pg-cola">
-      <div id="aviso-costos"></div>
+      <div id="pendientes"></div>
       <div class="fichas" id="fichas-estado" role="tablist" aria-label="Filtrar por estado"></div>
       <input type="search" class="search" id="q" placeholder="Buscar cliente, producto o celular..." oninput="pintarCola()" style="margin-bottom:10px"/>
       <details class="mas" id="mas-f">
@@ -425,14 +432,36 @@ function ir(pg,btn){
 const ETQ={PEDIDO:'Pedido a China',TRANSITO:'En tránsito',LLEGO:'Ya llegó',ENTREGADO:'Entregado'};
 let entregados=[], entTotal=0, fEstado='ABIERTOS', fDesde='', fHasta='', rapido='todo';
 
-// Aviso permanente: pedidos sin inversión y/o envío (la deuda de Juan Pablo depende de esto).
+// ---- Pendientes de Juan Pablo: se calculan solos, se pueden marcar «Hecho» o cerrar ----
+// «Hecho» lo esconde hasta que el problema CREZCA (si hoy hay 14 sin costo y mañana 15, vuelve).
+// «Cerrar» lo esconde hasta mañana. Se guarda en este aparato (localStorage); si no hay, sigue visible.
+const PK='vs-jp-pendientes';
+function pendLeer(){ try{ return JSON.parse(localStorage.getItem(PK)||'{}'); }catch(e){ return {}; } }
+function pendGuardar(o){ try{ localStorage.setItem(PK,JSON.stringify(o)); }catch(e){} }
+function pendOcultar(k,modo,n){ const o=pendLeer(); o[k]={modo,n:n||0,dia:hoy()}; pendGuardar(o); pintarPendientes(); }
+let faltanCosto=0, ventaCero=0;
+function pintarPendientes(){
+  const o=pendLeer();
+  const sinEst=pedidos.filter(x=>x.sinEstado).length;
+  const items=[
+    {k:'costos',n:faltanCosto,txt:`<b>${faltanCosto} pedido${faltanCosto===1?'':'s'} sin costo cargado.</b> Mientras falte la inversión y el envío, ese dinero no sube en tu saldo.`,go:'Cargar costos',fn:"ir('costos',$('tab-costos'));window.scrollTo(0,0)"},
+    {k:'estado',n:sinEst,txt:`<b>${sinEst} pedido${sinEst===1?'':'s'} sin estado definido.</b> Aparecen como «Pedido a China». Si ya van en camino o llegaron, cámbialos en cada tarjeta.`,go:'Ver cuáles',fn:"setEstado('PEDIDO');window.scrollTo(0,0)"},
+    {k:'venta0',n:ventaCero,txt:`<b>${ventaCero} pedido${ventaCero===1?'':'s'} con venta en $0.</b> Revisa el valor de venta en tu hoja de Importaciones.`},
+    {k:'prueba-imp',n:1,fijo:true,txt:'<b>Prueba la impresión una vez con papel real:</b> 1 rótulo y luego 4. Mira que el borde punteado salga completo y que nada se corte.'}
+  ].filter(i=>{
+    if(!i.n) return false;
+    const h=o[i.k]; if(!h) return true;
+    if(h.modo==='hecho') return !i.fijo && i.n>h.n;
+    return h.dia!==hoy();                       // cerrado: solo por hoy
+  });
+  $('pendientes').innerHTML=items.length?`<details class="pend-d" ${items.length<=2||o._abierto!==false?'open':''}><summary class="pend-t">Pendientes para ti (${items.length}) <span style="text-transform:none">· toca para ${'abrir o cerrar'}</span></summary>`+items.map(i=>`<div class="pend"><span>${i.txt}</span><div class="bt">${i.go?`<button class="go" onclick="${i.fn}">${i.go}</button>`:''}<button class="ok" onclick="pendOcultar('${i.k}','hecho',${i.n})">✓ Hecho</button><button onclick="pendOcultar('${i.k}','cerrar',${i.n})" aria-label="Cerrar por hoy">Cerrar</button></div></div>`).join('')+'</details>':'';
+  $('tab-costos').innerHTML='Costos'+(faltanCosto?`<span class="nbadge">${faltanCosto}</span>`:'');
+}
 async function avisoCostos(){
   try{
     const r=await get({action:'costos'});
     if(r.error) return;
-    const n=r.faltan||0;
-    $('aviso-costos').innerHTML=n?`<div class="aviso-costos"><span><b>${n} pedido${n===1?'':'s'} sin costo cargado.</b> Mientras falte la inversión y el envío, ese dinero no sube en tu saldo.</span><button onclick="ir('costos',$('tab-costos'));window.scrollTo(0,0)">Cargar costos</button></div>`:'';
-    $('tab-costos').innerHTML='Costos'+(n?`<span class="nbadge">${n}</span>`:'');
+    faltanCosto=r.faltan||0; pintarPendientes();
   }catch(e){}
 }
 async function cargarCola(){
@@ -442,7 +471,7 @@ async function cargarCola(){
     const verEnt=fEstado==='ENTREGADO';
     const r=await get({action:'cola',entregados:verEnt});
     if(r.error){ $('lista').innerHTML=`<div class="vacio">${esc(r.error)}</div>`; return; }
-    pedidos=r.pedidos||[]; sinLiq=r.sinLiquidar||0; entTotal=r.entregadosTotal||0;
+    pedidos=r.pedidos||[]; sinLiq=r.sinLiquidar||0; entTotal=r.entregadosTotal||0; ventaCero=r.ventaCero||0; pintarPendientes();
     if(verEnt) entregados=r.entregados||[];
     pintarCola();
   }catch(e){ $('lista').innerHTML='<div class="vacio">Error de conexión</div>'; }
