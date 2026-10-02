@@ -459,7 +459,6 @@ function pintarPendientes(){
   const items=[
     {k:'costos',n:faltanCosto,txt:`<b>${faltanCosto} pedido${faltanCosto===1?'':'s'} sin costo cargado.</b> Mientras falte la inversión y el envío, ese dinero no sube en tu saldo.`,go:'Cargar costos',fn:"ir('costos',$('tab-costos'));window.scrollTo(0,0)"},
     {k:'estado',n:sinEst,txt:`<b>${sinEst} pedido${sinEst===1?'':'s'} sin estado definido.</b> Aparecen como «Pedido a China». Si ya van en camino o llegaron, cámbialos en cada tarjeta.`,go:'Ver cuáles',fn:"setEstado('PEDIDO');window.scrollTo(0,0)"},
-    {k:'venta0',n:ventaCero,txt:`<b>${ventaCero} pedido${ventaCero===1?'':'s'} con venta en $0.</b> Revisa el valor de venta en tu hoja de Importaciones.`},
     {k:'prueba-imp',n:1,fijo:true,txt:'<b>Prueba la impresión una vez con papel real:</b> 1 rótulo y luego 4. Mira que el borde punteado salga completo y que nada se corte.'}
   ].filter(i=>{
     if(!i.n) return false;
@@ -546,7 +545,7 @@ function pintarCola(){
   if(soloPend) partes.push('sin costo');
   if(q) partes.push(`«${esc(q)}»`);
   $('resumen-f').innerHTML=filtrado?`<span>Viendo: ${partes.join(' · ')}</span><button onclick="limpiarFiltros()">Quitar filtros</button>`:
-    `<span>${sinLiq?`${sinLiq} sin costo cargado · `:''}${pedidos.filter(x=>x.usaPacho).length} con Pacho</span>`;
+    `<span>${pedidos.filter(x=>x.usaPacho).length} con Pacho</span>`;
 
   // Pista permanente: los entregados existen pero están ocultos.
   $('nota-oculta').innerHTML=(!verEnt&&entTotal)?`<div class="oculto-nota"><span>✓ <b>${entTotal} pedidos ya entregados</b> no se muestran para que tu lista quede limpia.</span><button onclick="setEstado('ENTREGADO');window.scrollTo({top:0,behavior:'smooth'})">Verlos</button></div>`:'';
