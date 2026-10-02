@@ -136,6 +136,7 @@ main{padding:20px 24px;max-width:1300px;margin:0 auto}
     <div class="tabs">
       <button class="tab active" onclick="ir('cola',this)">Mis pedidos</button>
       <button class="tab" onclick="ir('rotulos',this)">Rótulos</button>
+      <button class="tab" onclick="ir('costos',this)">Costos</button>
       <button class="tab" onclick="ir('pacho',this)">Pacho</button>
       <button class="tab" onclick="ir('deuda',this)">Deuda</button>
       <button class="tab" onclick="ir('ventas',this)">Ventas</button>
@@ -179,6 +180,20 @@ main{padding:20px 24px;max-width:1300px;margin:0 auto}
           <button class="btn-primary" id="rot-btn" onclick="rotImprimir()">Imprimir</button>
         </div>
       </div>
+    </div>
+
+    <div class="page" id="pg-costos">
+      <div class="cards" id="c-costos"><div class="loading">Cargando...</div></div>
+      <div class="aviso">Aquí cargas lo que pagaste por cada prenda (<b>inversión</b>) y lo que costó traerla (<b>envío</b>). Hay que poner <b>las dos</b>. Lo que guardes llega solo al panel de Andreu la próxima vez que se sincroniza, y de ahí sube tu saldo.</div>
+      <div class="hdr">
+        <span class="t" id="costos-n">Costos</span>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <input type="text" class="search" id="costos-q" placeholder="Buscar cliente o producto..." oninput="pintarCostos()"/>
+          <button class="btn-fs" id="b-costos-todos" onclick="costosToggle()">Ver todos</button>
+          <button class="btn-fs" onclick="cargarCostos()">Actualizar</button>
+        </div>
+      </div>
+      <div id="costos-lista"><div class="loading">Cargando...</div></div>
     </div>
 
     <div class="page" id="pg-pacho">
@@ -294,6 +309,7 @@ function ir(pg,btn){
   document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
   $('pg-'+pg).classList.add('active'); btn.classList.add('active');
   if(pg==='rotulos') cargarRotulos();
+  if(pg==='costos') cargarCostos();
   if(pg==='pacho') cargarPacho();
   if(pg==='deuda') cargarDeuda();
   if(pg==='ventas' && !$('d1').value){ rangoMes(0); }
@@ -544,6 +560,69 @@ function rotImprimir(){
     await cargarRotulos();
   });
   window.print();
+}
+
+// ============================================================
+// COSTOS — Juan Pablo carga o corrige inversión y envío; el servidor los escribe en Despachos
+// (de ahí los copia a BD Panel la sincronización de Andreu). Se exigen las dos casillas, en más de cero.
+let costos=[], costosTodos=false, costosBusy=false;
+const soloNum = v => Number(String(v||'').replace(/\D/g,''))||0;
+
+async function cargarCostos(){
+  $('costos-lista').innerHTML='<div class="loading">Cargando...</div>';
+  try{
+    const r=await get({action:'costos'});
+    if(r.error){ $('costos-lista').innerHTML=`<div class="vacio">${esc(r.error)}</div>`; costos=[]; return; }
+    costos=r.pedidos||[];
+    pintarCostos();
+  }catch(e){ $('costos-lista').innerHTML='<div class="vacio">Error de conexión</div>'; }
+}
+function costosToggle(){ costosTodos=!costosTodos; $('b-costos-todos').textContent=costosTodos?'Ver solo los que faltan':'Ver todos'; pintarCostos(); }
+
+function pintarCostos(){
+  const q=($('costos-q').value||'').toLowerCase();
+  const faltan=costos.filter(x=>x.falta);
+  const sinCosto=faltan.reduce((s,x)=>s+(x.venta||0),0);
+  $('c-costos').innerHTML=`
+    <div class="card"><div class="lbl">Sin costo cargado</div><div class="val ${faltan.length?'amber':'green'}">${faltan.length}</div><div class="sub">${faltan.length?'Faltan inversión y/o envío':'Todo cargado'}</div></div>
+    <div class="card"><div class="lbl">Vendido sin costo</div><div class="val">${cop(sinCosto)}</div><div class="sub">De esos pedidos</div></div>
+    <div class="card"><div class="lbl">Pedidos en Despachos</div><div class="val">${costos.length}</div><div class="sub">Con y sin costo</div></div>`;
+  let l=costos.map((x,i)=>({x,i})).filter(o=>costosTodos||o.x.falta);
+  if(q) l=l.filter(o=>(o.x.persona||'').toLowerCase().includes(q)||(o.x.producto||'').toLowerCase().includes(q)||String(o.x.id).includes(q));
+  $('costos-n').textContent=`${costosTodos?'Todos los pedidos':'Faltan costo'} (${l.length})`;
+  if(!l.length){ $('costos-lista').innerHTML=`<div class="vacio"><div class="big">✅</div><div>${costos.length?'No hay pedidos con ese filtro.':'No hay pedidos.'}</div></div>`; return; }
+  $('costos-lista').innerHTML=l.map(({x,i})=>`<div class="pedido ${x.falta?'pend':'listo'}">
+    <div class="ptop">
+      <div style="flex:1;min-width:220px">
+        <div class="pprod">${esc(x.producto)}${x.falta?'<span class="chip chip-pend">sin costo</span>':''}${x.importacion?'<span class="chip chip-pacho">importación</span>':''}</div>
+        <div class="pmeta">${esc(x.persona||'—')} · ${fFecha(x.fecha)} · #${esc(x.id)}</div>
+      </div>
+      <div class="pmoney"><b>${cop(x.venta)}</b>vendido</div>
+    </div>
+    <div class="pctrl">
+      <label class="chk">Inversión (la prenda) <input class="obs" style="width:130px;min-width:0;flex:none" id="ci-${i}" inputmode="numeric" placeholder="ej. 85000" value="${x.inversion>0?x.inversion:''}"></label>
+      <label class="chk">Envío <input class="obs" style="width:110px;min-width:0;flex:none" id="ce-${i}" inputmode="numeric" placeholder="ej. 25000" value="${x.envio>0?x.envio:''}"></label>
+      <button class="btn-ok" onclick="costoGuardar(${i})">Guardar</button>
+    </div>
+  </div>`).join('');
+}
+
+async function costoGuardar(i){
+  const x=costos[i]; if(!x||costosBusy) return;
+  const inv=soloNum($('ci-'+i).value), env=soloNum($('ce-'+i).value);
+  if(!(inv>0)||!(env>0)){ toast('Pon la inversión Y el envío (los dos mayores que cero)','err'); return; }
+  if(x.inversion>0&&x.envio>0&&(x.inversion!==inv||x.envio!==env)
+     &&!confirm(`Este pedido ya tenía costo.\n\nAntes: inversión ${cop(x.inversion)} · envío ${cop(x.envio)}\nAhora: inversión ${cop(inv)} · envío ${cop(env)}\n\n¿Cambiarlo?`)) return;
+  if(x.inversion===inv&&x.envio===env){ toast('No cambió nada'); return; }
+  costosBusy=true;
+  try{
+    const r=await post({action:'costo_guardar',id:x.id,inversion:inv,envio:env});
+    if(r.error){ toast(r.error,'err'); return; }
+    x.inversion=r.inversion; x.envio=r.envio; x.falta=false;
+    toast('Guardado. Llega al panel de Andreu en la próxima sincronización.');
+  }catch(e){ toast('No se pudo guardar. Revisa tu internet.','err'); return; }
+  finally{ costosBusy=false; }
+  pintarCostos();
 }
 
 // ============================================================
