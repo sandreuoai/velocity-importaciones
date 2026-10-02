@@ -33,7 +33,7 @@ header{background:var(--surface);border-bottom:1px solid var(--border);padding:0
 .btn-logout{white-space:nowrap;min-width:44px;min-height:44px}
 .bt-txt{display:none}
 .btn-logout:disabled{opacity:.6}
-.btn-logout{background:none;border:1px solid var(--border-strong);color:var(--muted);border-radius:10px;min-height:36px;padding:0 14px;font-size:13px;cursor:pointer}
+.btn-logout{background:none;border:1px solid var(--border-strong);color:var(--muted);border-radius:10px;padding:0 14px;font-size:13px;cursor:pointer}
 main{padding:14px 16px 24px;max-width:1300px;margin:0 auto}
 /* pestañas: una sola fila que se desliza con el dedo */
 .tabs{display:flex;gap:2px;margin:0 -16px 16px;padding:0 16px;border-bottom:1px solid var(--border);overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;position:sticky;top:52px;background:var(--bg);z-index:9}
@@ -87,7 +87,7 @@ main{padding:14px 16px 24px;max-width:1300px;margin:0 auto}
 .sel{width:100%;min-height:var(--toque);background:var(--surface2);border:1px solid var(--border-strong);color:var(--text);border-radius:10px;padding:0 12px;font-size:16px;outline:none;cursor:pointer}
 .obs{width:100%;min-height:var(--toque);background:var(--surface2);border:1px solid var(--border-strong);color:var(--text);border-radius:10px;padding:0 12px;font-size:16px;outline:none}
 .chk{display:flex;align-items:center;gap:10px;min-height:var(--toque);font-size:14px;color:var(--muted);cursor:pointer;user-select:none}
-.chk input{width:22px;height:22px;accent-color:var(--amber);cursor:pointer;flex:none}
+.chk input[type=checkbox]{width:22px;height:22px;accent-color:var(--amber);cursor:pointer;flex:none}
 .btn-wa{display:flex;align-items:center;justify-content:center;min-height:var(--toque);background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.3);color:#4ade80;border-radius:10px;padding:0 14px;font-size:14px;cursor:pointer;text-decoration:none;white-space:nowrap}
 .btn-wa:hover{background:rgba(34,197,94,.2)}
 .btn-ok{min-height:var(--toque);background:var(--green);border:none;color:#052e13;border-radius:10px;padding:0 16px;font-size:15px;font-weight:700;cursor:pointer;white-space:nowrap}
@@ -177,7 +177,7 @@ main{padding:14px 16px 24px;max-width:1300px;margin:0 auto}
   .pctrl .fila>*{flex:none}
   .pctrl .obs{flex:1;min-width:180px;width:auto;min-height:36px;font-size:13px}
   .chk{min-height:0;font-size:12px}
-  .chk input{width:15px;height:15px}
+  .chk input[type=checkbox]{width:15px;height:15px}
   .btn-wa,.btn-ok{min-height:36px;font-size:12px}
   .fichas,.rapidos{margin:0 0 12px;padding:2px 0;flex-wrap:wrap;overflow:visible}
   .ficha{min-height:38px;font-size:13px}
@@ -284,6 +284,7 @@ main{padding:14px 16px 24px;max-width:1300px;margin:0 auto}
           <button class="btn-fs" id="b-rot-desp" onclick="rotVerDespachados()">Ver despachados</button>
         </div>
       </div>
+      <div id="rot-confirma"></div>
       <div id="rot-aviso"></div>
       <div id="rot-lista"><div class="loading">Cargando...</div></div>
       <div class="barra-imp">
@@ -384,9 +385,11 @@ const cop = v => '$' + Math.round(v||0).toLocaleString('es-CO');
 const esc = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 const MES=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
 function fFecha(iso){ if(!iso) return '—'; const [y,m,d]=iso.split('-'); return `${parseInt(d)} ${MES[parseInt(m)-1]}`; }
-function hoy(){ return new Date().toISOString().split('T')[0]; }
-function diaMes(o=0){ const d=new Date(); d.setDate(1); d.setMonth(d.getMonth()+o); return d.toISOString().split('T')[0]; }
-function finMes(o=0){ const d=new Date(); d.setDate(1); d.setMonth(d.getMonth()+o+1); d.setDate(0); return d.toISOString().split('T')[0]; }
+// Fechas en la hora del aparato (Bogotá): toISOString da la de Londres y después de las 7 p. m. corre el día.
+const isoLocal = d => d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+function hoy(){ return isoLocal(new Date()); }
+function diaMes(o=0){ const d=new Date(); d.setDate(1); d.setMonth(d.getMonth()+o); return isoLocal(d); }
+function finMes(o=0){ const d=new Date(); d.setDate(1); d.setMonth(d.getMonth()+o+1); d.setDate(0); return isoLocal(d); }
 function destroy(k){ if(ch[k]){ ch[k].destroy(); delete ch[k]; } }
 
 function toast(msg, tipo){
@@ -458,7 +461,7 @@ function pintarPendientes(){
   const sinEst=pedidos.filter(x=>x.sinEstado).length;
   const items=[
     {k:'costos',n:faltanCosto,txt:`<b>${faltanCosto} pedido${faltanCosto===1?'':'s'} sin costo cargado.</b> Mientras falte la inversión y el envío, ese dinero no sube en tu saldo.`,go:'Cargar costos',fn:"ir('costos',$('tab-costos'));window.scrollTo(0,0)"},
-    {k:'estado',n:sinEst,txt:`<b>${sinEst} pedido${sinEst===1?'':'s'} sin estado definido.</b> Aparecen como «Pedido a China». Si ya van en camino o llegaron, cámbialos en cada tarjeta.`,go:'Ver cuáles',fn:"setEstado('PEDIDO');window.scrollTo(0,0)"},
+    {k:'estado',n:sinEst,txt:`<b>${sinEst} pedido${sinEst===1?'':'s'} sin estado definido.</b> Aparecen como «Pedido a China». Si ya van en camino o llegaron, cámbialos en cada tarjeta.`,go:'Ver cuáles',fn:"setEstado('SINESTADO');window.scrollTo(0,0)"},
     {k:'prueba-imp',n:1,fijo:true,txt:'<b>Prueba la impresión una vez con papel real:</b> 1 rótulo y luego 4. Mira que el borde punteado salga completo y que nada se corte.'}
   ].filter(i=>{
     if(!i.n) return false;
@@ -499,7 +502,7 @@ function rango(k){
   rapido=k; const h=hoy();
   if(k==='todo'){ fDesde=''; fHasta=''; }
   else if(k==='mes'){ fDesde=diaMes(0); fHasta=h; }
-  else { const d=new Date(); d.setDate(d.getDate()-Number(k)); fDesde=d.toISOString().split('T')[0]; fHasta=h; }
+  else { const d=new Date(); d.setDate(d.getDate()-Number(k)); fDesde=isoLocal(d); fHasta=h; }
   $('f-desde').value=fDesde; $('f-hasta').value=fHasta;
   pintarCola();
 }
@@ -530,14 +533,14 @@ function pintarCola(){
   document.querySelectorAll('#rapidos button').forEach(b=>b.classList.toggle('on',b.dataset.r===rapido));
 
   const verEnt=fEstado==='ENTREGADO';
-  let base=verEnt?entregados:(fEstado==='ABIERTOS'?pedidos:pedidos.filter(x=>x.estado===fEstado));
+  let base=verEnt?entregados:(fEstado==='ABIERTOS'?pedidos:fEstado==='SINESTADO'?pedidos.filter(x=>x.sinEstado):pedidos.filter(x=>x.estado===fEstado));
   let l=base;
   if(fDesde) l=l.filter(x=>x.fecha&&x.fecha>=fDesde);
   if(fHasta) l=l.filter(x=>x.fecha&&x.fecha<=fHasta);
   if(q) l=l.filter(x=>(x.persona||'').toLowerCase().includes(q)||(x.producto||'').toLowerCase().includes(q)||(x.numero||'').includes(q));
   if(soloPend) l=l.filter(x=>!x.liquidado);
 
-  const titulo=verEnt?'Entregados':(fEstado==='ABIERTOS'?'Por entregar':ETQ[fEstado]);
+  const titulo=verEnt?'Entregados':(fEstado==='ABIERTOS'?'Por entregar':fEstado==='SINESTADO'?'Sin estado':ETQ[fEstado]);
   $('cola-n').textContent=`${titulo} (${l.length})`;
   const filtrado=!!(fDesde||fHasta||q||soloPend||fEstado!=='ABIERTOS');
   const partes=[titulo];
@@ -601,12 +604,18 @@ function pintarCola(){
   }).join('');
 }
 
-async function guardar(i,campos,msg){
-  if(cargando) return;
+// Los cambios van en fila: si el anterior todavía se está guardando, este espera su turno
+// (antes se botaba en silencio y la pantalla lo mostraba como guardado).
+let colaGuardar=Promise.resolve();
+function guardar(i,campos,msg){
   const x=pedidos[i]; if(!x) return;
+  colaGuardar=colaGuardar.then(()=>guardarYa(x,campos,msg));
+  return colaGuardar;
+}
+async function guardarYa(x,campos,msg){
   cargando=true;
   try{
-    const r=await post({action:'actualizar',fila:x.fila,numero:x.numero,...campos});
+    const r=await post({action:'actualizar',fila:x.fila,numero:x.numero,producto:x.producto,...campos});
     if(r.error){ toast(r.error,'err'); await cargarCola(); return; }
     Object.assign(x,campos);
     toast(msg||'Guardado');
@@ -621,11 +630,12 @@ function cambiarPacho(i,v){
 }
 
 async function entregar(i){
-  const x=pedidos[i]; if(!x||cargando) return;
+  const x=pedidos[i]; if(!x) return;
   if(!confirm(`¿Marcar como ENTREGADO?\n\n${x.producto}\n${x.persona}\n\nSale de tu lista, pero queda guardado en el histórico.`)) return;
+  await colaGuardar; // primero termina lo que se estaba guardando
   cargando=true;
   try{
-    const r=await post({action:'entregar',fila:x.fila,numero:x.numero});
+    const r=await post({action:'entregar',fila:x.fila,numero:x.numero,producto:x.producto});
     if(r.error){ toast(r.error,'err'); }
     else toast('Entregado ✓');
   }catch(e){ toast('No se pudo guardar','err'); }
@@ -692,7 +702,9 @@ function pintarRotulos(){
 function rotToggle(i,v){ const x=rotulos[i]; if(!x) return; if(v) rotSel.add(x.id); else rotSel.delete(x.id); rotResumen(); }
 function rotMarcarListos(){ rotSel=new Set(rotulos.filter(x=>x.estado==='POR DESPACHAR'&&!rotFalta(x).length).map(x=>x.id)); pintarRotulos(); }
 function rotDesmarcar(){ rotSel=new Set(); pintarRotulos(); }
-function rotVerDespachados(){ rotVerDesp=!rotVerDesp; $('b-rot-desp').textContent=rotVerDesp?'Ocultar despachados':'Ver despachados'; pintarRotulos(); }
+function rotVerDespachados(){ rotVerDesp=!rotVerDesp;
+  // Al esconderlos, también salen de lo marcado: si no, se imprimirían sin verse.
+  if(!rotVerDesp) rotulos.forEach(x=>{ if(x.estado==='DESPACHADO') rotSel.delete(x.id); }); $('b-rot-desp').textContent=rotVerDesp?'Ocultar despachados':'Ver despachados'; pintarRotulos(); }
 function rotResumen(){
   const n=rotSel.size;
   const vac=(4-n%4)%4;
@@ -766,20 +778,27 @@ function rotImprimir(){
   }
   $('hoja-impresion').innerHTML=rotulosHTML(l);
   document.body.classList.add('imprimiendo');
-  window.addEventListener('afterprint',async function fin(){
-    window.removeEventListener('afterprint',fin);
-    document.body.classList.remove('imprimiendo'); $('hoja-impresion').innerHTML='';
-    // Cancelar el diálogo de impresión también dispara afterprint: solo cuenta como impreso si confirma.
-    if(!confirm(`¿Salieron bien los ${l.length} rótulos?\n\nAceptar los cuenta como impresos (queda guardado para todos).`)) return;
-    rotBusy=true;
-    try{
-      const r=await post({action:'rot_impreso',ids:l.map(x=>x.id)});
-      if(r.error) toast(r.error,'err'); else toast('Impresión registrada');
-    }catch(e){ toast('No se pudo registrar la impresión. Revisa tu internet.','err'); }
-    finally{ rotBusy=false; }
-    await cargarRotulos();
-  });
   window.print();
+  // La pregunta «¿salieron bien?» va en la pantalla y no en un aviso al cerrar la impresión: hay
+  // celulares que no avisan cuándo se cerró (o avisan antes de imprimir). La hoja se queda armada
+  // (solo se ve al imprimir), así que no importa cuándo llegue ese aviso.
+  rotPendiente=l; rotPintarConfirma();
+}
+let rotPendiente=null;
+function rotPintarConfirma(){
+  const l=rotPendiente;
+  $('rot-confirma').innerHTML=l?`<div class="pend"><span><b>¿Salieron bien los ${l.length} rótulo(s)?</b> Si sí, quedan contados como impresos para todos. Si algo salió mal, toca «Salió mal» e imprime otra vez.</span><div class="bt"><button class="ok" onclick="rotConfirmar(true)">Sí, salieron bien</button><button onclick="rotConfirmar(false)">Salió mal</button></div></div>`:'';
+}
+async function rotConfirmar(ok){
+  const l=rotPendiente; rotPendiente=null; rotPintarConfirma();
+  if(!ok||!l) return;
+  rotBusy=true;
+  try{
+    const r=await post({action:'rot_impreso',ids:l.map(x=>x.id)});
+    if(r.error) toast(r.error,'err'); else toast('Impresión registrada');
+  }catch(e){ toast('No se pudo registrar la impresión. Revisa tu internet.','err'); }
+  finally{ rotBusy=false; }
+  await cargarRotulos();
 }
 
 // ============================================================
