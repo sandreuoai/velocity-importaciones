@@ -118,6 +118,9 @@ main{padding:14px 16px 24px;max-width:1300px;margin:0 auto}
 .rapidos::-webkit-scrollbar{display:none}
 .rapidos button{flex:none;min-height:36px;padding:0 14px;border-radius:18px;border:1px solid var(--border);background:none;color:var(--muted);font-size:13px;cursor:pointer}
 .rapidos button.on{color:var(--text);border-color:var(--border-strong);background:var(--surface2)}
+.aviso-costos{display:flex;align-items:center;justify-content:space-between;gap:12px;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.4);border-radius:var(--radius);padding:12px 14px;margin-bottom:12px;font-size:14px;color:#fbbf24;line-height:1.4}
+.aviso-costos button{flex:none;min-height:var(--toque);padding:0 16px;border:none;border-radius:10px;background:var(--amber);color:#000;font-size:14px;font-weight:700;cursor:pointer}
+.tab .nbadge{display:inline-block;min-width:20px;padding:1px 6px;margin-left:6px;border-radius:10px;background:var(--amber);color:#000;font-size:12px;font-weight:700}
 .mas{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:6px}
 .mas summary{min-height:var(--toque);display:flex;align-items:center;padding:0 14px;font-size:14px;cursor:pointer;color:var(--text);list-style:none}
 .mas summary::-webkit-details-marker{display:none}
@@ -219,13 +222,14 @@ main{padding:14px 16px 24px;max-width:1300px;margin:0 auto}
     <div class="tabs">
       <button class="tab active" onclick="ir('cola',this)">Mis pedidos</button>
       <button class="tab" onclick="ir('rotulos',this)">Rótulos</button>
-      <button class="tab" onclick="ir('costos',this)">Costos</button>
+      <button class="tab" id="tab-costos" onclick="ir('costos',this)">Costos</button>
       <button class="tab" onclick="ir('pacho',this)">Pacho</button>
       <button class="tab" onclick="ir('deuda',this)">Deuda</button>
       <button class="tab" onclick="ir('ventas',this)">Ventas</button>
     </div>
 
     <div class="page active" id="pg-cola">
+      <div id="aviso-costos"></div>
       <div class="fichas" id="fichas-estado" role="tablist" aria-label="Filtrar por estado"></div>
       <input type="search" class="search" id="q" placeholder="Buscar cliente, producto o celular..." oninput="pintarCola()" style="margin-bottom:10px"/>
       <details class="mas" id="mas-f">
@@ -421,7 +425,18 @@ function ir(pg,btn){
 const ETQ={PEDIDO:'Pedido a China',TRANSITO:'En tránsito',LLEGO:'Ya llegó',ENTREGADO:'Entregado'};
 let entregados=[], entTotal=0, fEstado='ABIERTOS', fDesde='', fHasta='', rapido='todo';
 
+// Aviso permanente: pedidos sin inversión y/o envío (la deuda de Juan Pablo depende de esto).
+async function avisoCostos(){
+  try{
+    const r=await get({action:'costos'});
+    if(r.error) return;
+    const n=r.faltan||0;
+    $('aviso-costos').innerHTML=n?`<div class="aviso-costos"><span><b>${n} pedido${n===1?'':'s'} sin costo cargado.</b> Mientras falte la inversión y el envío, ese dinero no sube en tu saldo.</span><button onclick="ir('costos',$('tab-costos'));window.scrollTo(0,0)">Cargar costos</button></div>`:'';
+    $('tab-costos').innerHTML='Costos'+(n?`<span class="nbadge">${n}</span>`:'');
+  }catch(e){}
+}
 async function cargarCola(){
+  avisoCostos();
   $('lista').innerHTML='<div class="loading">Cargando...</div>';
   try{
     const verEnt=fEstado==='ENTREGADO';
@@ -780,7 +795,7 @@ async function costoGuardar(i){
   try{
     const r=await post({action:'costo_guardar',id:x.id,inversion:inv,envio:env});
     if(r.error){ toast(r.error,'err'); return; }
-    x.inversion=r.inversion; x.envio=r.envio; x.falta=false;
+    x.inversion=r.inversion; x.envio=r.envio; x.falta=false; avisoCostos();
     toast('Guardado. Llega al panel de Andreu en la próxima sincronización.');
   }catch(e){ toast('No se pudo guardar. Revisa tu internet.','err'); return; }
   finally{ costosBusy=false; }
