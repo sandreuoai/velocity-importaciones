@@ -321,6 +321,22 @@ main{padding:14px 16px 24px;max-width:1300px;margin:0 auto}
         <div class="ct">Detalle por mes</div>
         <ul class="rk" id="rk-pacho"><li class="loading" style="padding:20px 0">Cargando...</li></ul>
       </div>
+      <div class="chart-card">
+        <div class="ct">Marcar pagado a Pacho</div>
+        <div class="hdr" style="margin:0"><div class="acc">
+          <label style="color:var(--muted);font-size:13px">Le pagué todo lo pedido hasta</label>
+          <input type="date" class="search" id="pacho-hasta"/>
+          <button class="btn-f" onclick="pachoPagarHasta()">Marcar pagado</button>
+        </div></div>
+      </div>
+      <div class="hdr">
+        <span class="t" id="pacho-n">Pedidos con Pacho</span>
+        <div class="acc">
+          <input type="search" class="search" id="pacho-q" placeholder="Buscar cliente o producto..." oninput="pintarPachoLista()"/>
+          <select class="search" id="pacho-f" onchange="pintarPachoLista()"><option value="NO">Sin pagar</option><option value="SI">Pagados</option><option value="">Todos</option></select>
+        </div>
+      </div>
+      <div id="pacho-lista"></div>
     </div>
 
     <div class="page" id="pg-deuda">
@@ -873,6 +889,8 @@ async function cargarPacho(){
     const r=await get({action:'pacho'});
     if(r.error){ $('c-pacho').innerHTML=`<div class="loading">${esc(r.error)}</div>`; return; }
     const m=r.meses||[];
+    pachoPed=r.pedidos||[]; pintarPachoLista();
+    if(!$('pacho-hasta').value) $('pacho-hasta').value=new Date().toLocaleDateString('en-CA');
     const act=m.length?m[m.length-1]:null, ant=m.length>1?m[m.length-2]:null;
     let tend='—', clase='';
     if(act&&ant){
@@ -883,7 +901,7 @@ async function cargarPacho(){
     $('c-pacho').innerHTML=`
       <div class="card"><div class="lbl">Saldo con Pacho</div><div class="val ${r.saldo>0?'amber':'green'}">${cop(r.saldo)}</div><div class="sub">${r.pedidosPendientes} pedidos sin pagar</div></div>
       <div class="card"><div class="lbl">Este mes</div><div class="val">${act?act.pedidos:0}</div><div class="sub ${clase==='green'?'':'warn'}" style="${clase==='green'?'color:var(--green)':''}">${tend}</div></div>
-      <div class="card"><div class="lbl">Pagado histórico</div><div class="val">${cop(r.totalHistorico)}</div><div class="sub">${r.pedidosTotal} pedidos en total</div></div>
+      <div class="card"><div class="lbl">Ya le pagaste</div><div class="val green">${cop(r.pagado||0)}</div><div class="sub">De ${cop(r.totalHistorico)} en total (${r.pedidosTotal} pedidos)</div></div>
       <div class="card"><div class="lbl">Tarifa</div><div class="val">${cop(r.valorPacho)}</div><div class="sub">Por pedido gestionado</div></div>`;
 
     destroy('pacho');
@@ -903,6 +921,50 @@ async function cargarPacho(){
         <span class="rkv">${cop(x.valor)}</span></li>`;}).join('')
       : '<li style="padding:16px 0;color:var(--muted);font-size:12px;text-align:center">Todavía no has usado a Pacho</li>';
   }catch(e){ $('c-pacho').innerHTML='<div class="loading">Error de conexión</div>'; }
+}
+
+// Pago a Pacho (2026-10-05): pedido por pedido o «todo hasta tal fecha», entregados incluidos.
+// El servidor revisa cada pedido y el total antes de escribir: si algo cambió, no marca nada.
+let pachoPed=[], pachoBusy=false;
+function pintarPachoLista(){
+  const q=($('pacho-q').value||'').toLowerCase(), f=$('pacho-f').value;
+  const l=pachoPed.map((x,i)=>({x,i})).filter(o=>(!f||(f==='SI')===o.x.pagado)&&
+    (!q||(o.x.persona||'').toLowerCase().includes(q)||(o.x.producto||'').toLowerCase().includes(q)));
+  $('pacho-n').textContent=`${f==='NO'?'Sin pagar':f==='SI'?'Pagados':'Todos'} (${l.length}) · ${cop(l.reduce((s,o)=>s+o.x.valor,0))}`;
+  $('pacho-lista').innerHTML=l.length?l.map(({x,i})=>`<div class="pedido ${x.pagado?'listo':'pend'}">
+    <div class="ptop">
+      <div style="flex:1;min-width:0">
+        <div class="pprod">${esc(x.producto)}${x.entregado?'<span class="chip">entregado</span>':''}</div>
+        <div class="pmeta">${esc(x.persona||'—')} · ${fFecha(x.fecha)}</div>
+      </div>
+      <div class="pmoney"><b>${cop(x.valor)}</b>${x.pagado?'pagado':'sin pagar'}</div>
+    </div>
+    <button class="${x.pagado?'btn-fs':'btn-ok'}" onclick="pachoPagarUno(${i})">${x.pagado?'Quitar pago':'Marcar pagado'}</button>
+  </div>`).join(''):'<div class="vacio"><div>No hay pedidos con ese filtro.</div></div>';
+}
+async function pachoMarcar(lista,pagado,pregunta){
+  if(pachoBusy||!lista.length) return;
+  const total=lista.reduce((s,x)=>s+x.valor,0);
+  if(!confirm(pregunta)) return;
+  pachoBusy=true;
+  try{
+    const r=await post({action:'pacho_pagar',pagado,totalEsperado:total,
+      pedidos:lista.map(x=>({hoja:x.hoja,fila:x.fila,producto:x.producto}))});
+    if(r.error) toast('No se marcó nada: '+r.error,'err');
+    else toast(`Listo: ${r.marcados} pedido${r.marcados===1?'':'s'} por ${cop(r.total)}.`);
+  }catch(e){ toast('No se pudo guardar. Revisa tu internet.','err'); }
+  finally{ pachoBusy=false; cargarPacho(); }
+}
+function pachoPagarHasta(){
+  const hasta=$('pacho-hasta').value;
+  if(!hasta){ toast('Escoge la fecha.','err'); return; }
+  const lista=pachoPed.filter(x=>!x.pagado&&x.fecha&&x.fecha<=hasta);
+  if(!lista.length){ toast('No hay pedidos sin pagar hasta esa fecha.','err'); return; }
+  pachoMarcar(lista,true,`¿Marcar como PAGADOS a Pacho ${lista.length} pedido${lista.length===1?'':'s'} hasta el ${fFecha(hasta)}, por ${cop(lista.reduce((s,x)=>s+x.valor,0))}?\n\nIncluye los ya entregados.`);
+}
+function pachoPagarUno(i){
+  const x=pachoPed[i]; if(!x) return;
+  pachoMarcar([x],!x.pagado,`¿${x.pagado?'Quitar el pago de':'Marcar pagado'} «${x.producto}» (${cop(x.valor)})?`);
 }
 
 // ============================================================
