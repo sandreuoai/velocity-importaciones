@@ -296,7 +296,7 @@ main{padding:14px 16px 24px;max-width:1300px;margin:0 auto}
     </div>
 
     <div class="page" id="pg-cola">
-      <p class="pista"><b>Aquí llevas lo que le pediste a China: Pacho y observaciones.</b> El estado es el mismo de Envíos: si lo cambias aquí, cambia allá</p>
+      <p class="pista"><b>Aquí ves lo que le pediste a China y escribes observaciones.</b> El estado se cambia en Envíos y aquí se actualiza solo</p>
       <div id="pendientes"></div>
       <div class="fichas" id="fichas-estado" role="tablist" aria-label="Filtrar por estado"></div>
       <input type="search" class="search" id="q" placeholder="Buscar cliente, producto o celular..." oninput="pintarCola()" style="margin-bottom:10px"/>
@@ -457,6 +457,8 @@ let pedidos=[], soloPend=false, ch={}, cargando=false;
 
 const $ = id => document.getElementById(id);
 const cop = v => '$' + Math.round(v||0).toLocaleString('es-CO');
+// Sheets convierte «6/10» en fecha y el servidor la manda como «Tue Oct 06 2026 00:00:00 GMT-0500…»: se muestra «6/10/2026».
+const obsTxt = v => { const m=String(v||'').match(/^\w{3} (\w{3}) (\d{2}) (\d{4}) \d{2}:\d{2}:\d{2} GMT/); if(!m) return String(v||''); const k=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'].indexOf(m[1]); return k<0?String(v):`${parseInt(m[2])}/${k+1}/${m[3]}`; };
 const esc = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 const MES=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
 function fFecha(iso){ if(!iso) return '—'; const [y,m,d]=iso.split('-'); return `${parseInt(d)} ${MES[parseInt(m)-1]}`; }
@@ -602,25 +604,26 @@ function togglePend(){
 
 function pintarCola(){
   const q=($('q').value||'').toLowerCase();
-  const n=k=>pedidos.filter(x=>x.estado===k).length;
+  const unidos=pedidos.filter(x=>x.pedidoId), sinUnir=pedidos.filter(x=>!x.pedidoId);
+  const n=k=>unidos.filter(x=>x.estado===k).length;
   const chip=(v,t,c,extra='')=>`<button class="ficha ${extra} ${fEstado===v?'on':''}" role="tab" aria-selected="${fEstado===v}" onclick="setEstado('${v}')">${t} <b>${c}</b></button>`;
   $('fichas-estado').innerHTML=
-    chip('ABIERTOS','Por entregar',pedidos.length)+chip('PEDIDO','Pedido a China',n('PEDIDO'))+
+    chip('ABIERTOS','Por entregar',unidos.length)+chip('PEDIDO','Pedido a China',n('PEDIDO'))+
     chip('TRANSITO','En tránsito',n('TRANSITO'))+chip('LLEGO','Ya llegó',n('LLEGO'))+
-    chip('ENTREGADO','✓ Entregados',entTotal,'apar');
+    chip('ENTREGADO','✓ Entregados',entTotal,'apar')+(sinUnir.length?chip('SINUNIR','Sin venta en Envíos',sinUnir.length,'apar'):'');
   $('mas-t').textContent=(fDesde||fHasta||soloPend)?'📅 Filtros activos: '+[(fDesde||fHasta)?('pedidos '+(fDesde?'desde '+fFecha(fDesde):'')+(fDesde&&fHasta?' ':'')+(fHasta?'hasta '+fFecha(fHasta):'')):'',soloPend?'sin costo':''].filter(Boolean).join(' · '):'📅 Fechas y más filtros';
   const on=document.querySelector('#fichas-estado .ficha.on'); if(on) on.scrollIntoView({inline:'center',block:'nearest'});
   document.querySelectorAll('#rapidos button').forEach(b=>b.classList.toggle('on',b.dataset.r===rapido));
 
   const verEnt=fEstado==='ENTREGADO';
-  let base=verEnt?entregados:(fEstado==='ABIERTOS'?pedidos:fEstado==='SINESTADO'?pedidos.filter(x=>x.sinEstado):pedidos.filter(x=>x.estado===fEstado));
+  let base=verEnt?entregados:(fEstado==='ABIERTOS'?unidos:fEstado==='SINUNIR'?sinUnir:fEstado==='SINESTADO'?pedidos.filter(x=>x.sinEstado):unidos.filter(x=>x.estado===fEstado));
   let l=base;
   if(fDesde) l=l.filter(x=>x.fecha&&x.fecha>=fDesde);
   if(fHasta) l=l.filter(x=>x.fecha&&x.fecha<=fHasta);
   if(q) l=l.filter(x=>(x.persona||'').toLowerCase().includes(q)||(x.producto||'').toLowerCase().includes(q)||(x.numero||'').includes(q));
   if(soloPend) l=l.filter(x=>!x.liquidado);
 
-  const titulo=verEnt?'Entregados':(fEstado==='ABIERTOS'?'Por entregar':fEstado==='SINESTADO'?'Sin estado':ETQ[fEstado]);
+  const titulo=verEnt?'Entregados':(fEstado==='ABIERTOS'?'Por entregar':fEstado==='SINUNIR'?'Sin venta en Envíos':fEstado==='SINESTADO'?'Sin estado':ETQ[fEstado]);
   $('cola-n').textContent=`${titulo} (${l.length})`;
   const filtrado=!!(fDesde||fHasta||q||soloPend||fEstado!=='ABIERTOS');
   const partes=[titulo];
@@ -650,7 +653,7 @@ function pintarCola(){
         <div style="flex:1;min-width:0">
           <div class="pprod">${esc(x.producto||'(sin producto)')}<span class="chip chip-ok">Entregado ${fFecha(x.entregadoEl)}</span>${x.usaPacho?'<span class="chip chip-pacho">Pacho</span>':''}</div>
           <div class="pmeta">${esc(x.persona||'—')} · pedido ${fFecha(x.fecha)}${x.numero?' · '+esc(x.numero):''}</div>
-          ${x.obs?`<div class="pmeta">${esc(x.obs)}</div>`:''}
+          ${x.obs?`<div class="pmeta">${esc(obsTxt(x.obs))}</div>`:''}
         </div>
         ${x.sinPlata?'':`<div class="pmoney"><b>${cop(x.venta)}</b>${x.liquidado?`costo ${cop(x.compra)} · envío ${cop(x.envio)}`:'sin costo cargado'}</div>`}
       </div>
@@ -672,14 +675,9 @@ function pintarCola(){
         </div>`}
       </div>
       <div class="pctrl">
-        <select class="sel" aria-label="Estado del pedido" onchange="cambiarEstado(${i},this.value)">
-          <option value="PEDIDO"${x.estado==='PEDIDO'?' selected':''}>Pedido a China</option>
-          <option value="TRANSITO"${x.estado==='TRANSITO'?' selected':''}>En tránsito</option>
-          <option value="LLEGO"${x.estado==='LLEGO'?' selected':''}>Ya llegó</option>
-        </select>
-        ${hoy()<=pachoHasta||x.usaPacho?`<label class="chk"><input type="checkbox" ${x.usaPacho?'checked':''} onchange="cambiarPacho(${i},this.checked)"> Usé a Pacho</label>`:''}
-        <input class="obs" placeholder="Observación..." value="${esc(x.obs||'')}" onchange="cambiarObs(${i},this.value)">
-        <div class="fila">${waBtn}<button class="btn-ok" onclick="entregar(${i})">Entregado</button></div>
+        ${x.pedidoId?'':'<div class="aviso" style="margin:0">No encontré su venta en Envíos (otro nombre o fecha), así que su estado no se mueve solo. Cuando le llegue al cliente, ciérrala aquí</div>'}
+        <input class="obs" placeholder="Observación..." aria-label="Observación" value="${esc(obsTxt(x.obs))}" onchange="cambiarObs(${i},this.value)">
+        <div class="fila">${waBtn}${x.pedidoId?'':`<button class="btn-ok" onclick="entregar(${i})">Ya se entregó</button>`}</div>
       </div>
     </div>`;
   }).join('');
@@ -704,7 +702,6 @@ async function guardarYa(x,campos,msg){
   }catch(e){ toast('No se pudo guardar. Revisa tu internet.','err'); }
   finally{ cargando=false; }
 }
-function cambiarEstado(i,v){ guardar(i,{estado:v},'Estado actualizado'); pedidos[i].estado=v; }
 // El estado también se guarda en Envíos: si salió WhatsApp al cliente, Juan Pablo lo ve aquí.
 function avisoEnvio(r){
   const w=r&&r.envio&&r.envio.whatsapp;
@@ -712,10 +709,6 @@ function avisoEnvio(r){
   return w.enviado?' · WhatsApp al cliente ✓':' · el WhatsApp no salió: búscalo en Envíos para llamarlo';
 }
 function cambiarObs(i,v){ guardar(i,{obs:v},'Observación guardada'); }
-function cambiarPacho(i,v){
-  guardar(i,{usaPacho:v},v?'Marcado con Pacho':'Pacho quitado');
-  pedidos[i].usaPacho=v; pedidos[i].pacho=v?15000:0;
-}
 
 async function entregar(i){
   const x=pedidos[i]; if(!x) return;
@@ -1332,7 +1325,7 @@ function pintarPachoLista(){
       <div style="flex:1;min-width:0">
         <div class="pprod">${esc(x.producto)}${x.entregado?'<span class="chip">entregado</span>':''}</div>
         <div class="pmeta">${esc(x.persona||'—')} · ${x.fechaCompra?'compró '+fFecha(x.fechaCompra)+' · ':''}pedido ${fFecha(x.fecha)}${x.pagado&&x.pagadoEl?' · pagado '+fFecha(x.pagadoEl):''}</div>
-        ${x.obs?`<div class="pmeta">${esc(x.obs)}</div>`:''}
+        ${x.obs?`<div class="pmeta">${esc(obsTxt(x.obs))}</div>`:''}
       </div>
       <div class="pmoney"><b>${cop(x.valor)}</b>${x.pagado?'pagado':'sin pagar'}</div>
     </div>
