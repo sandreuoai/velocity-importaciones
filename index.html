@@ -78,6 +78,7 @@ main{padding:14px 16px 24px;max-width:1300px;margin:0 auto}
 .pedido.hecho{border-left:3px solid var(--border-strong);opacity:.92}
 .ptop{display:flex;flex-direction:column;gap:8px;margin-bottom:10px}
 .pprod{font-size:15px;font-weight:600;line-height:1.35}
+.pista{font-size:13px;color:var(--muted);margin:0 0 12px;line-height:1.4}
 .pmeta{font-size:13px;color:var(--muted);margin-top:3px}
 .pmoney{font-size:13px;color:var(--muted)}
 .pmoney b{color:var(--text);font-size:16px;display:block}
@@ -107,7 +108,7 @@ main{padding:14px 16px 24px;max-width:1300px;margin:0 auto}
 .toast.ok{border-color:rgba(34,197,94,.4);color:#4ade80}
 .toast.err{border-color:rgba(248,113,113,.4);color:#f87171}
 .search{width:100%;min-height:var(--toque);background:var(--surface);border:1px solid var(--border-strong);color:var(--text);border-radius:10px;padding:0 12px;font-size:16px;outline:none}
-/* ---- filtros de «Mis pedidos»: estado (fichas), fecha y resumen ---- */
+/* ---- filtros de «Compras a China»: estado (fichas), fecha y resumen ---- */
 .fichas{display:flex;gap:8px;overflow-x:auto;margin:0 -16px 12px;padding:2px 16px;-webkit-overflow-scrolling:touch;scrollbar-width:none}
 .fichas::-webkit-scrollbar{display:none}
 .ficha{flex:none;min-height:var(--toque);display:flex;align-items:center;gap:8px;padding:0 14px;border-radius:22px;border:1px solid var(--border-strong);background:var(--surface);color:var(--text);font-size:14px;cursor:pointer;white-space:nowrap}
@@ -247,7 +248,7 @@ main{padding:14px 16px 24px;max-width:1300px;margin:0 auto}
   <main>
     <div class="tabs">
       <button class="tab active" onclick="ir('envios',this)">Envíos</button>
-      <button class="tab" onclick="ir('cola',this)">Mis pedidos</button>
+      <button class="tab" onclick="ir('cola',this)">Compras a China</button>
       <button class="tab" onclick="ir('rotulos',this)">Rótulos</button>
       <button class="tab" id="tab-costos" onclick="ir('costos',this)">Costos</button>
       <button class="tab" onclick="ir('pacho',this)">Pacho</button>
@@ -256,6 +257,7 @@ main{padding:14px 16px 24px;max-width:1300px;margin:0 auto}
     </div>
 
     <div class="page active" id="pg-envios">
+      <p class="pista">Cada pedido, hasta que llega al cliente. Desde «Por preparar», cada cambio le llega por WhatsApp</p>
       <div id="env-aviso"></div>
       <div class="fichas" id="env-fichas" role="tablist" aria-label="Filtrar por estado"></div>
       <input type="search" class="search" id="env-q" placeholder="Buscar cliente, producto, celular o guía..." oninput="pintarEnvios()" style="margin-bottom:10px"/>
@@ -269,6 +271,7 @@ main{padding:14px 16px 24px;max-width:1300px;margin:0 auto}
     </div>
 
     <div class="page" id="pg-cola">
+      <p class="pista">Lo que le pediste a China: costo, Pacho y si ya llegó. El cliente no ve nada de aquí</p>
       <div id="pendientes"></div>
       <div class="fichas" id="fichas-estado" role="tablist" aria-label="Filtrar por estado"></div>
       <input type="search" class="search" id="q" placeholder="Buscar cliente, producto o celular..." oninput="pintarCola()" style="margin-bottom:10px"/>
