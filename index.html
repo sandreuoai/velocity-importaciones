@@ -1272,6 +1272,7 @@ function pintarPedBarra(){
   b.hidden=!pedL.length; if(b.hidden) return;
   b.innerHTML=`<b>${n?`${n} prenda${n===1?'':'s'}${nt?` · ${cop(nt*15000)} para Pacho`:''}`:'Elige las prendas que le vas a pedir'}</b>
     <button class="btn-ok" onclick="pedExportar(false)" ${n&&!pedBusy?'':'disabled'}>Hacer el PDF para Pacho</button>
+    <button class="btn-fs" onclick="pedBodega()" ${n&&!pedBusy?'':'disabled'}>Está en bodega</button>
     <button class="btn-fs" onclick="pedExportar(true)" ${n&&!pedBusy?'':'disabled'}>Ya se las había pedido</button>`;
 }
 async function pedExportar(soloMarcar){
@@ -1298,6 +1299,24 @@ async function pedExportar(soloMarcar){
   }catch(e){ toast('No se pudo. Revisa tu internet y vuelve a intentar.','err'); }
   pedBusy=false; await cargarPedir();
 }
+// En una segunda revisión apareció en la bodega: sale de la lista y en Envíos queda como de bodega. Va pedido por
+// pedido con todas sus prendas por pedir (las elegidas en bodega, las demás importación) para que el pedido no quede a
+// medio marcar: si ya no le queda nada por pedir, pasa solo a «Por preparar».
+async function pedBodega(){
+  const l=pedL.filter(x=>pedSel.has(x.llave));
+  if(!l.length||pedBusy) return;
+  if(!confirm(`¿Sacar ${l.length} prenda${l.length===1?'':'s'} de la lista porque ${l.length===1?'está':'están'} en bodega?\n\nNo se le piden a Pacho y en Envíos quedan como de bodega.`)) return;
+  pedBusy=true; pintarPedBarra(); toast('Guardando...');
+  const ids=[...new Set(l.map(x=>x.id))], mal=[];
+  for(const id of ids){
+    const origen=Object.fromEntries(pedL.filter(x=>x.id===id).map(x=>[x.idx,pedSel.has(x.llave)?'B':'I']));
+    try{ const r=await post({action:'envio_origen',id,origen}); if(r.error) mal.push('#'+id+': '+r.error); }
+    catch(e){ mal.push('#'+id+': sin conexión'); }
+  }
+  toast(mal.length?`No se pudo con ${mal.length}: ${mal.join(' · ')}`:`Listo: ${l.length} en bodega ✓`, mal.length?'err':'ok');
+  pedBusy=false; await cargarPedir();
+}
+
 // En el celular abre «Compartir» con el PDF (eliges WhatsApp y a Pacho). Donde no se puede, lo baja y abre su chat.
 async function pedMandar(){
   if(!pedPdf) return;
