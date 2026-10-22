@@ -108,7 +108,7 @@ main{padding:14px 16px 24px;max-width:1300px;margin:0 auto}
 .toast.ok{border-color:rgba(34,197,94,.4);color:#4ade80}
 .toast.err{border-color:rgba(248,113,113,.4);color:#f87171}
 .search{width:100%;min-height:var(--toque);background:var(--surface);border:1px solid var(--border-strong);color:var(--text);border-radius:10px;padding:0 12px;font-size:16px;outline:none}
-/* ---- filtros de «Compras a China»: estado (fichas), fecha y resumen ---- */
+/* ---- filtros de «Importaciones»: estado (fichas), fecha y resumen ---- */
 .fichas{display:flex;gap:8px;overflow-x:auto;margin:0 -16px 12px;padding:2px 16px;-webkit-overflow-scrolling:touch;scrollbar-width:none}
 .fichas::-webkit-scrollbar{display:none}
 .ficha{flex:none;min-height:var(--toque);display:flex;align-items:center;gap:8px;padding:0 14px;border-radius:22px;border:1px solid var(--border-strong);background:var(--surface);color:var(--text);font-size:14px;cursor:pointer;white-space:nowrap}
@@ -248,7 +248,7 @@ main{padding:14px 16px 24px;max-width:1300px;margin:0 auto}
   <main>
     <div class="tabs">
       <button class="tab active" onclick="ir('envios',this)">Envíos</button>
-      <button class="tab" onclick="ir('cola',this)">Compras a China</button>
+      <button class="tab" onclick="ir('cola',this)">Importaciones</button>
       <button class="tab" onclick="ir('rotulos',this)">Rótulos</button>
       <button class="tab" id="tab-costos" onclick="ir('costos',this)">Costos</button>
       <button class="tab" onclick="ir('pacho',this)">Pacho</button>
@@ -257,7 +257,7 @@ main{padding:14px 16px 24px;max-width:1300px;margin:0 auto}
     </div>
 
     <div class="page active" id="pg-envios">
-      <p class="pista">Cada pedido, hasta que llega al cliente. Desde «Por preparar», cada cambio le llega por WhatsApp</p>
+      <p class="pista"><b>Aquí avanzas cada pedido hasta que le llega al cliente.</b> Desde «Por preparar», cada cambio le avisa al cliente por WhatsApp</p>
       <div id="env-aviso"></div>
       <div class="fichas" id="env-fichas" role="tablist" aria-label="Filtrar por estado"></div>
       <input type="search" class="search" id="env-q" placeholder="Buscar cliente, producto, celular o guía..." oninput="pintarEnvios()" style="margin-bottom:10px"/>
@@ -271,7 +271,7 @@ main{padding:14px 16px 24px;max-width:1300px;margin:0 auto}
     </div>
 
     <div class="page" id="pg-cola">
-      <p class="pista">Lo que le pediste a China: costo, Pacho y si ya llegó. El cliente no ve nada de aquí</p>
+      <p class="pista"><b>Aquí llevas lo que le pediste a China: Pacho y observaciones.</b> El estado es el mismo de Envíos: si lo cambias aquí, cambia allá</p>
       <div id="pendientes"></div>
       <div class="fichas" id="fichas-estado" role="tablist" aria-label="Filtrar por estado"></div>
       <input type="search" class="search" id="q" placeholder="Buscar cliente, producto o celular..." oninput="pintarCola()" style="margin-bottom:10px"/>
@@ -621,7 +621,7 @@ function pintarCola(){
           <div class="pmeta">${esc(x.persona||'—')} · pedido ${fFecha(x.fecha)}${x.numero?' · '+esc(x.numero):''}</div>
           ${x.obs?`<div class="pmeta">${esc(x.obs)}</div>`:''}
         </div>
-        <div class="pmoney"><b>${cop(x.venta)}</b>${x.liquidado?`costo ${cop(x.compra)} · envío ${cop(x.envio)}`:'sin costo cargado'}</div>
+        ${x.sinPlata?'':`<div class="pmoney"><b>${cop(x.venta)}</b>${x.liquidado?`costo ${cop(x.compra)} · envío ${cop(x.envio)}`:'sin costo cargado'}</div>`}
       </div>
       ${waBtn?`<div class="pctrl">${waBtn}</div>`:''}
     </div>`;
@@ -631,13 +631,14 @@ function pintarCola(){
           <div class="pprod">${esc(x.producto||'(sin producto)')}
             ${!x.liquidado?'<span class="chip chip-pend">sin costo</span>':''}
             ${x.usaPacho?'<span class="chip chip-pacho">Pacho</span>':''}
+            ${x.pedidoId?`<span class="chip chip-shop">Envíos #${esc(x.pedidoId)}: ${esc(EST_TXT[x.estadoEnvios]||'')}</span>`:''}
           </div>
           <div class="pmeta">${esc(x.persona||'—')} · ${fFecha(x.fecha)}${x.numero?' · '+esc(x.numero):''}</div>
         </div>
-        <div class="pmoney">
+        ${x.sinPlata?'':`<div class="pmoney">
           <b>${cop(x.venta)}</b>
           ${x.liquidado?`costo ${cop(x.compra)} · envío ${cop(x.envio)}`:'costo pendiente'}
-        </div>
+        </div>`}
       </div>
       <div class="pctrl">
         <select class="sel" aria-label="Estado del pedido" onchange="cambiarEstado(${i},this.value)">
@@ -667,11 +668,18 @@ async function guardarYa(x,campos,msg){
     const r=await post({action:'actualizar',fila:x.fila,numero:x.numero,producto:x.producto,...campos});
     if(r.error){ toast(r.error,'err'); await cargarCola(); return; }
     Object.assign(x,campos);
-    toast(msg||'Guardado');
+    toast((msg||'Guardado')+avisoEnvio(r));
+    if(r.envio&&campos.estado) await cargarCola();
   }catch(e){ toast('No se pudo guardar. Revisa tu internet.','err'); }
   finally{ cargando=false; }
 }
 function cambiarEstado(i,v){ guardar(i,{estado:v},'Estado actualizado'); pedidos[i].estado=v; }
+// El estado también se guarda en Envíos: si salió WhatsApp al cliente, Juan Pablo lo ve aquí.
+function avisoEnvio(r){
+  const w=r&&r.envio&&r.envio.whatsapp;
+  if(!w||!w.aplica) return r&&r.envio?' · también en Envíos':'';
+  return w.enviado?' · WhatsApp al cliente ✓':' · el WhatsApp no salió: búscalo en Envíos para llamarlo';
+}
 function cambiarObs(i,v){ guardar(i,{obs:v},'Observación guardada'); }
 function cambiarPacho(i,v){
   guardar(i,{usaPacho:v},v?'Marcado con Pacho':'Pacho quitado');
@@ -686,7 +694,7 @@ async function entregar(i){
   try{
     const r=await post({action:'entregar',fila:x.fila,numero:x.numero,producto:x.producto});
     if(r.error){ toast(r.error,'err'); }
-    else toast('Entregado ✓');
+    else toast('Entregado ✓'+avisoEnvio(r));
   }catch(e){ toast('No se pudo guardar','err'); }
   finally{ cargando=false; await cargarCola(); }
 }
