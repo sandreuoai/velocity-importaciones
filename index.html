@@ -164,6 +164,12 @@ main{padding:14px 16px 24px;max-width:1300px;margin:0 auto}
 .env-form{display:flex;flex-direction:column;gap:10px;background:var(--surface2);border:1px solid var(--border-strong);border-radius:var(--radius);padding:12px}
 .env-form label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted)}
 .env-form .bt{display:flex;gap:8px;flex-wrap:wrap}.env-form .bt>*{flex:1 1 140px}
+.ped{display:flex;gap:12px;align-items:flex-start}
+.ped img,.ped .sinf{width:84px;height:84px;object-fit:cover;border-radius:10px;flex:none;background:var(--surface2)}
+.ped .sinf{display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--muted);text-align:center}
+.ped-talla{display:inline-block;min-width:44px;padding:4px 10px;margin-right:8px;border-radius:8px;background:var(--surface2);border:1px solid var(--border-strong);font-size:18px;font-weight:700;text-align:center}
+.ped-ok{display:flex;flex-direction:column;gap:10px;background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.35);border-radius:var(--radius);padding:14px;margin-bottom:14px;color:#4ade80;font-size:14px;line-height:1.45}
+.ped-ok .bt{display:flex;gap:8px;flex-wrap:wrap}.ped-ok .bt>*{flex:1 1 150px}
 .env-foto img{display:block;max-width:100%;max-height:70vh;border-radius:10px;margin-top:8px}
 .psel{display:flex;align-items:center;gap:10px;min-height:44px;font-size:14px;color:var(--text);cursor:pointer}
 .psel input{width:22px;height:22px;accent-color:#c084fc}
@@ -253,16 +259,17 @@ main{padding:14px 16px 24px;max-width:1300px;margin:0 auto}
   <main>
     <div class="tabs">
       <button class="tab active" onclick="ir('envios',this)">Envíos</button>
+      <button class="tab" onclick="ir('pedir',this)">Pedir a Pacho</button>
       <button class="tab" onclick="ir('cola',this)">Importaciones</button>
       <button class="tab" onclick="ir('rotulos',this)">Rótulos</button>
       <button class="tab" id="tab-costos" onclick="ir('costos',this)">Costos</button>
-      <button class="tab" onclick="ir('pacho',this)">Pacho</button>
+      <button class="tab" id="tab-pacho" onclick="ir('pacho',this)">Pacho</button>
       <button class="tab" onclick="ir('deuda',this)">Deuda</button>
       <button class="tab" onclick="ir('ventas',this)">Ventas</button>
     </div>
 
     <div class="page active" id="pg-envios">
-      <p class="pista"><b>Aquí avanzas cada pedido hasta que le llega al cliente.</b> Desde «Por preparar», cada cambio le avisa al cliente por WhatsApp</p>
+      <p class="pista"><b>Aquí avanzas cada pedido hasta que le llega al cliente.</b> Cada venta nueva llega en «Revisar bodega»: busca cada prenda y márcala. Desde «Por preparar», cada cambio le avisa al cliente por WhatsApp</p>
       <div id="env-aviso"></div>
       <div class="fichas" id="env-fichas" role="tablist" aria-label="Filtrar por estado"></div>
       <input type="search" class="search" id="env-q" placeholder="Buscar cliente, producto, celular o guía..." oninput="pintarEnvios()" style="margin-bottom:10px"/>
@@ -273,6 +280,19 @@ main{padding:14px 16px 24px;max-width:1300px;margin:0 auto}
         </select>
       </div>
       <div id="env-lista"><div class="loading">Cargando...</div></div>
+    </div>
+
+    <div class="page" id="pg-pedir">
+      <p class="pista"><b>Aquí armas el pedido a Pacho.</b> Salen las prendas que marcaste «Importación» en Envíos y todavía no le pides. Elige, revisa talla y dorsal, y manda el PDF</p>
+      <div id="ped-aviso"></div>
+      <div id="ped-listo"></div>
+      <input type="search" class="search" id="ped-q" placeholder="Buscar cliente o camiseta..." oninput="pintarPedir()" style="margin-bottom:10px"/>
+      <div class="hdr" style="flex-direction:row;align-items:center;justify-content:space-between;margin-top:6px">
+        <span class="t" id="ped-n">Por pedir</span>
+        <button class="btn-fs" onclick="pedTodos()" id="ped-todos">Elegir todas</button>
+      </div>
+      <div id="ped-lista"><div class="loading">Cargando...</div></div>
+      <div class="pacho-barra" id="ped-barra" hidden></div>
     </div>
 
     <div class="page" id="pg-cola">
@@ -348,6 +368,7 @@ main{padding:14px 16px 24px;max-width:1300px;margin:0 auto}
     </div>
 
     <div class="page" id="pg-pacho">
+      <div id="pacho-fin"></div>
       <div class="cards" id="c-pacho"><div class="loading">Cargando...</div></div>
       <div class="chart-card">
         <div class="ct">Pedidos gestionados con Pacho, por mes</div>
@@ -431,6 +452,7 @@ main{padding:14px 16px 24px;max-width:1300px;margin:0 auto}
 const API = 'https://script.google.com/macros/s/AKfycbzUL4cY9ZefOLfXfSgaNxgvl3xpIarZgktKqAxn5Cyi6ATd2a46vCLeP51itaIn6xM6/exec';
 
 let U='', P='';                 // credenciales de la sesión
+let pachoHasta='2026-10-30';     // Pacho cobra $15.000 por prenda solo por las ventas hasta este día
 let pedidos=[], soloPend=false, ch={}, cargando=false;
 
 const $ = id => document.getElementById(id);
@@ -469,6 +491,8 @@ async function entrar(){
     const r=await post({action:'login'});
     if(r.error){ $('lerr').textContent=r.error; U=P=''; return; }
     $('login').style.display='none'; $('app').style.display='block';
+    pachoHasta=r.pachoHasta||pachoHasta;
+    $('tab-pacho').hidden=r.pachoVisible===false;   // desde noviembre Pacho tiene sueldo: la pestaña se va al quedar en $0
     cargarEnvios(); avisoCostos();
   }catch(e){ $('lerr').textContent='No se pudo conectar. Revisa tu internet.'; U=P=''; }
 }
@@ -477,7 +501,7 @@ function salir(){ U=P=''; $('app').style.display='none'; $('login').style.displa
 let pgActual='envios';
 async function actualizarActual(){
   const b=$('b-act'); b.disabled=true; b.style.opacity='.5';
-  const f={envios:cargarEnvios,cola:cargarCola,rotulos:cargarRotulos,costos:cargarCostos,pacho:cargarPacho,deuda:cargarDeuda,ventas:cargarVentas}[pgActual];
+  const f={envios:cargarEnvios,pedir:cargarPedir,cola:cargarCola,rotulos:cargarRotulos,costos:cargarCostos,pacho:cargarPacho,deuda:cargarDeuda,ventas:cargarVentas}[pgActual];
   try{ await f(); toast('Actualizado'); }catch(e){ toast('No se pudo actualizar','err'); }
   b.disabled=false; b.style.opacity='';
 }
@@ -487,6 +511,7 @@ function ir(pg,btn){
   document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
   $('pg-'+pg).classList.add('active'); btn.classList.add('active');
   if(pg==='envios') cargarEnvios();
+  if(pg==='pedir') cargarPedir();
   if(pg==='cola') cargarCola();
   if(pg==='rotulos') cargarRotulos();
   if(pg==='costos') cargarCostos();
@@ -639,7 +664,7 @@ function pintarCola(){
             ${x.usaPacho?'<span class="chip chip-pacho">Pacho</span>':''}
             ${x.pedidoId?`<span class="chip chip-shop">Envíos #${esc(x.pedidoId)}: ${esc(EST_TXT[x.estadoEnvios]||'')}</span>`:''}
           </div>
-          <div class="pmeta">${esc(x.persona||'—')} · ${fFecha(x.fecha)}${x.numero?' · '+esc(x.numero):''}</div>
+          <div class="pmeta">${esc(x.persona||'—')} · ${x.fechaCompra?'compró '+fFecha(x.fechaCompra)+' · ':''}pedido ${fFecha(x.fecha)}${x.usaPacho?(x.pachoPagado?' · pagado a Pacho'+(x.pagadoEl?' '+fFecha(x.pagadoEl):''):' · sin pagar a Pacho'):''}${x.numero?' · '+esc(x.numero):''}</div>
         </div>
         ${x.sinPlata?'':`<div class="pmoney">
           <b>${cop(x.venta)}</b>
@@ -652,7 +677,7 @@ function pintarCola(){
           <option value="TRANSITO"${x.estado==='TRANSITO'?' selected':''}>En tránsito</option>
           <option value="LLEGO"${x.estado==='LLEGO'?' selected':''}>Ya llegó</option>
         </select>
-        <label class="chk"><input type="checkbox" ${x.usaPacho?'checked':''} onchange="cambiarPacho(${i},this.checked)"> Usé a Pacho</label>
+        ${hoy()<=pachoHasta||x.usaPacho?`<label class="chk"><input type="checkbox" ${x.usaPacho?'checked':''} onchange="cambiarPacho(${i},this.checked)"> Usé a Pacho</label>`:''}
         <input class="obs" placeholder="Observación..." value="${esc(x.obs||'')}" onchange="cambiarObs(${i},this.value)">
         <div class="fila">${waBtn}<button class="btn-ok" onclick="entregar(${i})">Entregado</button></div>
       </div>
@@ -711,7 +736,7 @@ async function entregar(i){
 // y Shopify le manda el correo al cliente) y «entregado». «En China» y «Viene para Colombia» son internos.
 // Al cambiar el estado (salvo En China y Viene para Colombia) el servidor le manda al cliente la plantilla de WhatsApp
 // del estado. Si no sale o el número no tiene WhatsApp, la tarjeta dice a quién llamar o escribir.
-const EST_ENV=[['EN CHINA','En China'],['EN CAMINO','Viene para Colombia'],['POR DESPACHAR','Por preparar'],['PREPARANDO','Preparando'],['DESPACHADO','Despachado'],['ENTREGADO','Entregado']];
+const EST_ENV=[['POR REVISAR','Revisar bodega'],['POR PEDIR','Por pedir a Pacho'],['EN CHINA','Pedido a China'],['EN CAMINO','Viene para Colombia'],['POR DESPACHAR','Por preparar'],['PREPARANDO','Preparando'],['DESPACHADO','Despachado'],['ENTREGADO','Entregado']];
 const EST_TXT=Object.fromEntries(EST_ENV);
 const SHOP_TXT={UNFULFILLED:'sin preparar',OPEN:'sin preparar',IN_PROGRESS:'en preparación',FULFILLED:'enviado',PARTIALLY_FULFILLED:'enviado en parte',ON_HOLD:'en espera',SCHEDULED:'programado',PENDING_FULFILLMENT:'pendiente'};
 let envios=[], envF='HACER', envForm=null, envBusy=false, envTrans=['Interrapidísimo'];
@@ -727,22 +752,22 @@ async function cargarEnvios(){
   }catch(e){ $('env-lista').innerHTML='<div class="vacio">Error de conexión</div>'; }
 }
 
-const envGrupo={HACER:['POR DESPACHAR','PREPARANDO'],'EN CHINA':['EN CHINA'],'EN CAMINO':['EN CAMINO'],DESPACHADO:['DESPACHADO'],ENTREGADO:['ENTREGADO']};
+const envGrupo={HACER:['POR REVISAR','POR DESPACHAR','PREPARANDO'],'POR PEDIR':['POR PEDIR'],'EN CHINA':['EN CHINA'],'EN CAMINO':['EN CAMINO'],DESPACHADO:['DESPACHADO'],ENTREGADO:['ENTREGADO']};
 function envFiltro(v){ envF=v; envForm=null; pintarEnvios(); }
 
 function pintarEnvios(){
   const n=k=>envios.filter(x=>envGrupo[k].includes(x.estado)).length;
   const chip=(v,t)=>`<button class="ficha ${envF===v?'on':''}" role="tab" aria-selected="${envF===v}" onclick="envFiltro('${v}')">${t} <b>${n(v)}</b></button>`;
-  $('env-fichas').innerHTML=chip('HACER','Por hacer')+chip('EN CHINA','En China')+chip('EN CAMINO','Viene para Colombia')+chip('DESPACHADO','Despachados')+chip('ENTREGADO','Entregados');
+  $('env-fichas').innerHTML=chip('HACER','Por hacer')+chip('POR PEDIR','Por pedir a Pacho')+chip('EN CHINA','Pedido a China')+chip('EN CAMINO','Viene para Colombia')+chip('DESPACHADO','Despachados')+chip('ENTREGADO','Entregados');
   const q=($('env-q').value||'').toLowerCase().trim();
   let l=q?envios:envios.filter(x=>envGrupo[envF].includes(x.estado));   // la búsqueda mira todos los estados
   if(q) l=l.filter(x=>[x.persona,x.producto,x.numero,x.guia,x.id,x.shopify&&x.shopify.pedido].some(v=>String(v||'').toLowerCase().includes(q)));
-  $('env-n').textContent=(q?'Resultados':{HACER:'Por hacer','EN CHINA':'En China','EN CAMINO':'Viene para Colombia',DESPACHADO:'Despachados',ENTREGADO:'Entregados'}[envF])+` (${l.length})`;
+  $('env-n').textContent=(q?'Resultados':{HACER:'Por hacer','POR PEDIR':'Por pedir a Pacho','EN CHINA':'Pedido a China','EN CAMINO':'Viene para Colombia',DESPACHADO:'Despachados',ENTREGADO:'Entregados'}[envF])+` (${l.length})`;
   if(!l.length){ $('env-lista').innerHTML=`<div class="vacio"><div class="big">✅</div><div>${q?'Ningún pedido coincide.':'No hay pedidos aquí.'}</div></div>`; return; }
   $('env-lista').innerHTML=l.map(envTarjeta).join('');
 }
 
-function envClase(e){ return ['EN CHINA','EN CAMINO'].includes(e)?'env-espera':e==='POR DESPACHAR'?'env-hacer':e==='PREPARANDO'?'env-prep':'env-ok'; }
+function envClase(e){ return ['POR PEDIR','EN CHINA','EN CAMINO'].includes(e)?'env-espera':e==='POR DESPACHAR'||e==='POR REVISAR'?'env-hacer':e==='PREPARANDO'?'env-prep':'env-ok'; }
 
 function envTarjeta(x){
   const i=envios.indexOf(x), s=x.shopify;
@@ -757,6 +782,7 @@ function envTarjeta(x){
   const aviso=x.shopifyAviso?`<div class="aviso" style="margin:0">Shopify: ${esc(x.shopifyAviso)}<div style="margin-top:8px"><button class="btn-fs" onclick="envGuardar(${i},'${x.estado}')">Reintentar en Shopify</button></div></div>`:'';
   const wa=envWa(x,i);
   const form=envForm===x.id?envFormulario(x,i):'';
+  const origen=envOrigenBloque(x,i);
   return `<div class="pedido ${envClase(x.estado)}">
     <div class="ptop"><div style="flex:1;min-width:0">
       <div class="pprod">${esc(rotItems(x.producto).join(' · ')||'(sin producto)')}</div>
@@ -765,13 +791,49 @@ function envTarjeta(x){
       ${guia}${foto}
     </div></div>
     <div class="pctrl">
-      ${aviso}${wa}
-      <select class="sel" aria-label="Estado del pedido" onchange="envCambiar(${i},this)" ${envBusy?'disabled':''}>
-        ${EST_ENV.map(([v,t])=>`<option value="${v}"${x.estado===v?' selected':''}>${t}</option>`).join('')}
-      </select>
+      ${aviso}${wa}${origen}
+      ${x.estado==='POR REVISAR'?'':`<select class="sel" aria-label="Estado del pedido" onchange="envCambiar(${i},this)" ${envBusy?'disabled':''}>
+        ${EST_ENV.filter(([v])=>!EST_AUTO.includes(v)||v===x.estado).map(([v,t])=>`<option value="${v}"${x.estado===v?' selected':''}${EST_AUTO.includes(v)?' disabled':''}>${t}</option>`).join('')}
+      </select>`}
       ${form}
     </div>
   </div>`;
+}
+
+// Bodega o importación, prenda por prenda (Andreu, 2026-10-22): la regla de la página no siempre acierta.
+// Con todas marcadas el pedido se mueve solo: todo en bodega → Por preparar; alguna de importación → Pedir a Pacho.
+const EST_AUTO=['POR REVISAR','POR PEDIR'];
+let envOrigenAbierto=null;
+function envOrigenBloque(x,i){
+  const pr=x.prendas||[];
+  if(!pr.length) return '';
+  const editable=['POR REVISAR','POR PEDIR','POR DESPACHAR'].includes(x.estado);
+  if(x.estado!=='POR REVISAR'){
+    if(!editable||envOrigenAbierto!==x.id) return editable&&(x.estado==='POR PEDIR'||pr.some(p=>p.origen))?`<button class="btn-link" onclick="envOrigenAbierto='${esc(x.id)}';pintarEnvios()">Corregir bodega o importación</button>`:'';
+  }
+  const btn=(p,v,t)=>`<button class="${p.origen===v?'btn-ok':'btn-fs'}" aria-pressed="${p.origen===v}" onclick="envOrigen(${i},{${p.idx}:'${v}'})" ${envBusy?'disabled':''}>${t}</button>`;
+  return `<div class="env-form">
+    <div style="font-size:13px;color:var(--muted)">¿Está en la bodega? La página dice <b>${x.sugerida==='I'?'importación':'bodega'}</b>; mira y marca cada prenda</div>
+    ${pr.map(p=>`<div><div style="font-size:14px;margin-bottom:6px"><b>${esc(p.talla||'Única')}</b> · ${esc(p.titulo)}${p.opciones?' · '+esc(p.opciones):''}</div>
+      <div class="bt">${btn(p,'B','En bodega')}${btn(p,'I','Importación')}</div></div>`).join('')}
+    ${pr.length>1?`<div class="bt"><button class="btn-fs" onclick="envOrigen(${i},${esc(JSON.stringify(Object.fromEntries(pr.map(p=>[p.idx,'B']))))})">Todo en bodega</button><button class="btn-fs" onclick="envOrigen(${i},${esc(JSON.stringify(Object.fromEntries(pr.map(p=>[p.idx,'I']))))})">Todo importación</button></div>`:''}
+  </div>`;
+}
+async function envOrigen(i,origen){
+  const x=envios[i]; if(!x||envBusy) return;
+  envBusy=true;
+  try{
+    const r=await post({action:'envio_origen',id:x.id,origen});
+    if(r.error){ toast(r.error,'err'); }
+    else{
+      (x.prendas||[]).forEach(p=>{ if(r.origen[p.idx]) p.origen=r.origen[p.idx]; });
+      const antes=x.estado; x.estado=r.estado; x.importacion=r.importacion;
+      if(r.estado!=='POR REVISAR') envOrigenAbierto=null;
+      if(r.estado!==antes) toast(r.estado==='POR PEDIR'?'Pasa a «Pedir a Pacho» ✓':r.estado==='POR DESPACHAR'?'Todo en bodega: queda «Por preparar» ✓':'Guardado ✓');
+      else toast('Guardado ✓');
+    }
+  }catch(e){ toast('No se pudo guardar. Revisa tu internet.','err'); }
+  envBusy=false; pintarEnvios();
 }
 
 function envFormulario(x,i){
@@ -801,7 +863,7 @@ async function envDespachar(i){
   if(!/^[0-9A-Z-]{4,30}$/.test(guia)){ toast('Escribe el número de guía','err'); $('env-g').focus(); return; }
   let foto=null;
   if(f){ try{ foto=await envComprimir(f); }catch(e){ toast('La foto no se pudo leer. Tómala otra vez.','err'); return; } }
-  else if(!x.tieneFoto && !confirm('¿Guardar sin foto de la guía? La puedes subir después.')) return;
+  else if(!x.tieneFoto){ toast('Toma la foto de la guía: le llega al cliente con el WhatsApp','err'); return; }
   $('env-ok').disabled=true;
   await envGuardar(i,'DESPACHADO',{guia,transportadora:trans,foto});
 }
@@ -905,7 +967,7 @@ const rotLugar = x => [x.ciudad,x.departamento].filter(Boolean).join(' — ');
 const rotFalta = x => ['persona','cedula','numero'].filter(k=>!x[k]).concat(rotLugar(x)?[]:['ciudad']).concat(x.producto?[]:['producto']);
 const rotItems = p => String(p||'').split('|').map(s=>s.trim()).filter(Boolean);
 const rotElegidos = () => rotulos.filter(x=>rotSel.has(x.id));
-const ROT_ESPERA=['EN CHINA','EN CAMINO'], ROT_LISTO=['POR DESPACHAR','PREPARANDO'], ROT_SALIO=['DESPACHADO','ENTREGADO'];
+const ROT_ESPERA=['POR REVISAR','POR PEDIR','EN CHINA','EN CAMINO'], ROT_LISTO=['POR DESPACHAR','PREPARANDO'], ROT_SALIO=['DESPACHADO','ENTREGADO'];
 const rotPreseleccion = x => ROT_LISTO.includes(x.estado) && !x.impresiones && !rotFalta(x).length;
 
 async function cargarRotulos(){
@@ -922,7 +984,7 @@ async function cargarRotulos(){
 function rotFila(x){
   const f=rotFalta(x), rojo=t=>`<span class="falta-txt">${t}</span>`;
   const chips=(x.importacion?'<span class="chip chip-pacho">importación</span>':'')
-    +(ROT_ESPERA.includes(x.estado)?`<span class="chip chip-pend">${x.estado==='EN CHINA'?'en China':'viene para Colombia'}</span>`:'')
+    +(ROT_ESPERA.includes(x.estado)?`<span class="chip chip-pend">${{'POR REVISAR':'revisar bodega','POR PEDIR':'por pedir a Pacho','EN CHINA':'pedido a China'}[x.estado]||'viene para Colombia'}</span>`:'')
     +(x.estado==='PREPARANDO'?'<span class="chip chip-shop">preparando</span>':'')
     +(x.impresiones?`<span class="chip chip-ok">impreso ${x.impresiones}×${x.ultimaImpresion?' · '+esc(x.ultimaImpresion):''}</span>`:'')
     +(ROT_SALIO.includes(x.estado)?`<span class="chip chip-ok">${x.estado==='ENTREGADO'?'entregado':'despachado'}${x.despachadoEl?' '+esc(x.despachadoEl):''}</span>`:'');
@@ -1124,6 +1186,8 @@ async function cargarPacho(){
     const r=await get({action:'pacho'});
     if(r.error){ $('c-pacho').innerHTML=`<div class="loading">${esc(r.error)}</div>`; return; }
     const m=r.meses||[];
+    $('pacho-fin').innerHTML=`<div class="aviso info">Desde el 1 de noviembre Pacho tiene sueldo: solo las ventas hasta el ${fFecha(r.tarifaHasta)} cobran ${cop(r.valorPacho)} por prenda. ${hoy()>r.tarifaHasta?'Cuando le pagues todo, esta pestaña desaparece sola':'Después de pagarle ese saldo, esta pestaña desaparece sola'}</div>`;
+    if(r.visible===false) $('tab-pacho').hidden=true;
     pachoPed=r.pedidos||[]; pachoSel=new Set(); pintarPachoLista();
     if(!$('pacho-hasta').value) $('pacho-hasta').value=new Date().toLocaleDateString('en-CA');
     const act=m.length?m[m.length-1]:null, ant=m.length>1?m[m.length-2]:null;
@@ -1134,7 +1198,7 @@ async function cargarPacho(){
       clase = d<0?'green':d>0?'amber':'';
     }
     $('c-pacho').innerHTML=`
-      <div class="card"><div class="lbl">Saldo con Pacho</div><div class="val ${r.saldo>0?'amber':'green'}">${cop(r.saldo)}</div><div class="sub">${r.pedidosPendientes} pedidos sin pagar</div></div>
+      <div class="card"><div class="lbl">Le debes a Pacho</div><div class="val ${r.saldo>0?'amber':'green'}">${cop(r.saldo)}</div><div class="sub">${r.pedidosPendientes} prendas ${r.ultimoPago?'desde el último pago ('+fFecha(r.ultimoPago)+')':'sin pagar'} hasta las ventas del ${fFecha(r.tarifaHasta)}${r.porPedirConTarifa?` · faltan ${r.porPedirConTarifa} por pedirle (suman ${cop(r.porPedirConTarifa*r.valorPacho)})`:''}</div></div>
       <div class="card"><div class="lbl">Este mes</div><div class="val">${act?act.pedidos:0}</div><div class="sub ${clase==='green'?'':'warn'}" style="${clase==='green'?'color:var(--green)':''}">${tend}</div></div>
       <div class="card"><div class="lbl">Ya le pagaste</div><div class="val green">${cop(r.pagado||0)}</div><div class="sub">De ${cop(r.totalHistorico)} en total (${r.pedidosTotal} pedidos)</div></div>
       <div class="card"><div class="lbl">Tarifa</div><div class="val">${cop(r.valorPacho)}</div><div class="sub">Por pedido gestionado</div></div>`;
@@ -1158,6 +1222,102 @@ async function cargarPacho(){
   }catch(e){ $('c-pacho').innerHTML='<div class="loading">Error de conexión</div>'; }
 }
 
+// ============================================================
+// PEDIR A PACHO (2026-10-22) — el pedido a China sale de aquí, no del Excel.
+// Cada prenda de importación que sigue «En China» y no se le ha pedido. Juan Pablo elige, corrige el dorsal y escribe
+// la observación; el servidor arma el PDF por camiseta y anota cada prenda en Importaciones con $15.000 para Pacho.
+const PACHO_WA='573008747427';   // +57 300 874 7427
+let pedL=[], pedSel=new Set(), pedBusy=false, pedPdf=null;
+async function cargarPedir(){
+  $('ped-lista').innerHTML='<div class="loading">Cargando... (las fotos tardan unos segundos)</div>';
+  try{
+    const r=await get({action:'pedir_pacho'});
+    if(r.error){ $('ped-lista').innerHTML=`<div class="vacio">${esc(r.error)}</div>`; return; }
+    pedL=(r.lineas||[]).map(x=>({...x,obs:''}));
+    pedSel=new Set(pedL.filter(x=>x.talla).map(x=>x.llave));   // lo que no tiene talla (llaveros, gorras) se elige a mano
+    $('ped-aviso').innerHTML=r.avisoFotos?`<div class="aviso">No pude traer las fotos de Shopify: ${esc(r.avisoFotos)} El PDF sale sin foto.</div>`:'';
+    pintarPedir();
+  }catch(e){ $('ped-lista').innerHTML='<div class="vacio">Error de conexión</div>'; }
+}
+function pedVisibles(){
+  const q=($('ped-q').value||'').toLowerCase().trim();
+  return q?pedL.filter(x=>[x.persona,x.titulo,x.dorsal,x.id].some(v=>String(v||'').toLowerCase().includes(q))):pedL;
+}
+function pintarPedir(){
+  const l=pedVisibles();
+  $('ped-n').textContent=`Por pedir (${l.length})`;
+  $('ped-todos').textContent=l.length&&l.every(x=>pedSel.has(x.llave))?'Quitar todas':'Elegir todas';
+  $('ped-lista').innerHTML=l.length?l.map(x=>{
+    const k=esc(x.llave);
+    return `<div class="pedido ${pedSel.has(x.llave)?'listo':''}">
+      <div class="ped">
+        ${x.foto?`<img src="${esc(x.foto+(x.foto.includes('?')?'&':'?')+'width=200')}" alt="${esc(x.titulo)}" loading="lazy">`:'<div class="sinf">Sin foto</div>'}
+        <div style="flex:1;min-width:0">
+          <div class="pprod">${esc(x.titulo)}</div>
+          <div style="margin:6px 0"><span class="ped-talla">${esc(x.talla||'Única')}</span>${x.opciones?`<span class="pmeta">${esc(x.opciones)}</span>`:''}</div>
+          <div class="pmeta">${esc(x.persona||'—')} · compró ${fFecha(x.fecha)} · #${esc(x.id)}${x.canal==='SHOPIFY'?' · página':''}</div>
+        </div>
+      </div>
+      <div class="pctrl">
+        ${x.nota?`<div class="aviso" style="margin:0">Nota del pedido: ${esc(x.nota)}</div>`:''}
+        <input class="obs" placeholder="Dorsal: nombre y número (ej: JAMES #10)" aria-label="Dorsal" value="${esc(x.dorsal||'')}" oninput="pedCampo('${k}','dorsal',this.value)">
+        ${x.inscripcion?`<div class="pmeta">Inscripción: ${esc(x.inscripcion)}</div>`:''}
+        <input class="obs" placeholder="Observación (ej: pagó la mitad)" aria-label="Observación" value="${esc(x.obs||'')}" oninput="pedCampo('${k}','obs',this.value)">
+        <label class="chk"><input type="checkbox" ${pedSel.has(x.llave)?'checked':''} onchange="pedElegir('${k}',this.checked)"> Pedir esta prenda</label>
+      </div>
+    </div>`;}).join(''):'<div class="vacio"><div class="big">✅</div><div>No hay prendas por pedir a Pacho.</div></div>';
+  pintarPedBarra();
+}
+function pedCampo(k,campo,v){ const x=pedL.find(y=>y.llave===k); if(x) x[campo]=v; }
+function pedElegir(k,on){ if(on) pedSel.add(k); else pedSel.delete(k); pintarPedir(); }
+function pedTodos(){ const l=pedVisibles(), todas=l.every(x=>pedSel.has(x.llave)); l.forEach(x=>todas?pedSel.delete(x.llave):pedSel.add(x.llave)); pintarPedir(); }
+function pintarPedBarra(){
+  const b=$('ped-barra'), n=pedL.filter(x=>pedSel.has(x.llave)).length, nt=pedL.filter(x=>pedSel.has(x.llave)&&x.fecha<=pachoHasta).length;
+  b.hidden=!pedL.length; if(b.hidden) return;
+  b.innerHTML=`<b>${n?`${n} prenda${n===1?'':'s'}${nt?` · ${cop(nt*15000)} para Pacho`:''}`:'Elige las prendas que le vas a pedir'}</b>
+    <button class="btn-ok" onclick="pedExportar(false)" ${n&&!pedBusy?'':'disabled'}>Hacer el PDF para Pacho</button>
+    <button class="btn-fs" onclick="pedExportar(true)" ${n&&!pedBusy?'':'disabled'}>Ya se las había pedido</button>`;
+}
+async function pedExportar(soloMarcar){
+  const l=pedL.filter(x=>pedSel.has(x.llave));
+  if(!l.length||pedBusy) return;
+  const sinDorsal=l.filter(x=>x.nota&&!x.dorsal).length, nt=l.filter(x=>x.fecha<=pachoHasta).length;
+  const msg=soloMarcar?`¿Quitar de la lista ${l.length} prenda${l.length===1?'':'s'}?\n\nNo hace PDF ni suma a Pacho: es para lo que ya pediste con el Excel.`
+    :`¿Pedirle a Pacho ${l.length} prenda${l.length===1?'':'s'}?\n\n${nt?`Suma ${cop(nt*15000)} a lo que le debes a Pacho (ventas hasta el ${fFecha(pachoHasta)}). `:''}Quedan en Importaciones y en Envíos como «Pedido a China».`+(sinDorsal?`\n\nOjo: ${sinDorsal} pidió estampado y no tiene dorsal escrito.`:'');
+  if(!confirm(msg)) return;
+  pedBusy=true; pintarPedBarra(); toast(soloMarcar?'Guardando...':'Armando el PDF...');
+  try{
+    const r=await post({action:'pacho_pedir',soloMarcar,lineas:l.map(x=>({llave:x.llave,dorsal:x.dorsal||'',obs:x.obs||''}))});
+    if(r.error){ toast(r.error,'err'); }
+    else if(soloMarcar){ toast(`Listo: ${r.prendas} quitada${r.prendas===1?'':'s'} de la lista`); }
+    else{
+      const bytes=Uint8Array.from(atob(r.pdf),c=>c.charCodeAt(0));
+      pedPdf={blob:new Blob([bytes],{type:'application/pdf'}),nombre:r.nombre};
+      $('ped-listo').innerHTML=`<div class="ped-ok"><div><b>PDF listo: ${r.prendas} prenda${r.prendas===1?'':'s'}.</b> Ya quedaron como «Pedido a China»${r.total?` y suman ${cop(r.total)} para Pacho`:''}. Ahora mándale el PDF</div>
+        <div class="bt"><button class="btn-ok" onclick="pedMandar()">Mandar a Pacho</button><button class="btn-fs" onclick="pedBajar()">Bajar el PDF</button>
+        <a class="btn-wa" href="https://wa.me/${PACHO_WA}" target="_blank" rel="noopener">Abrir el chat de Pacho</a></div></div>`;
+      toast('PDF listo ✓');
+      window.scrollTo({top:0,behavior:'smooth'});
+    }
+  }catch(e){ toast('No se pudo. Revisa tu internet y vuelve a intentar.','err'); }
+  pedBusy=false; await cargarPedir();
+}
+// En el celular abre «Compartir» con el PDF (eliges WhatsApp y a Pacho). Donde no se puede, lo baja y abre su chat.
+async function pedMandar(){
+  if(!pedPdf) return;
+  const f=new File([pedPdf.blob],pedPdf.nombre,{type:'application/pdf'});
+  if(navigator.canShare&&navigator.canShare({files:[f]})){
+    try{ await navigator.share({files:[f],title:pedPdf.nombre}); return; }catch(e){ if(e&&e.name==='AbortError') return; }
+  }
+  pedBajar(); window.open(`https://wa.me/${PACHO_WA}`,'_blank','noopener');
+  toast('Se bajó el PDF: adjúntalo en el chat de Pacho');
+}
+function pedBajar(){
+  if(!pedPdf) return;
+  const a=document.createElement('a'); a.href=URL.createObjectURL(pedPdf.blob); a.download=pedPdf.nombre;
+  document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },4000);
+}
+
 // Pago a Pacho (2026-10-05): pedido por pedido o «todo hasta tal fecha», entregados incluidos.
 // El servidor revisa cada pedido y el total antes de escribir: si algo cambió, no marca nada.
 let pachoPed=[], pachoBusy=false, pachoSel=new Set();
@@ -1171,7 +1331,8 @@ function pintarPachoLista(){
     <div class="ptop">
       <div style="flex:1;min-width:0">
         <div class="pprod">${esc(x.producto)}${x.entregado?'<span class="chip">entregado</span>':''}</div>
-        <div class="pmeta">${esc(x.persona||'—')} · ${fFecha(x.fecha)}</div>
+        <div class="pmeta">${esc(x.persona||'—')} · ${x.fechaCompra?'compró '+fFecha(x.fechaCompra)+' · ':''}pedido ${fFecha(x.fecha)}${x.pagado&&x.pagadoEl?' · pagado '+fFecha(x.pagadoEl):''}</div>
+        ${x.obs?`<div class="pmeta">${esc(x.obs)}</div>`:''}
       </div>
       <div class="pmoney"><b>${cop(x.valor)}</b>${x.pagado?'pagado':'sin pagar'}</div>
     </div>
