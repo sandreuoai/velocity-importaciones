@@ -765,7 +765,8 @@ function envClase(e){ return ['POR PEDIR','EN CHINA','EN CAMINO'].includes(e)?'e
 function envTarjeta(x){
   const i=envios.indexOf(x), s=x.shopify;
   const chips=`<span class="chip ${x.canal==='SHOPIFY'?'chip-shop':'chip-ok'}">${x.canal==='SHOPIFY'?'Página':'WhatsApp'}</span>`
-    +(x.importacion?'<span class="chip chip-pacho">importación</span>':'')
+    +(x.importacion?`<span class="chip chip-pacho">${x.estado==='POR PEDIR'?'importación: toca pedirla a Pacho':'importación'}</span>`
+      :(x.prendas||[]).length&&(x.prendas||[]).every(p=>p.origen==='B')?'<span class="chip chip-ok">en bodega</span>':'')
     +(s?`<span class="chip chip-shop">Shopify ${esc(s.pedido)}${s.cancelado?': cancelado':s.estado?': '+esc(SHOP_TXT[s.estado]||s.estado.toLowerCase()):''}</span>`:'')
     +(x.canal==='SHOPIFY'&&!s&&!x.shopifyPedido?'<span class="chip chip-pend">sin unir a Shopify</span>':'')
     +(x.shopifyAviso?'<span class="chip chip-err">Shopify no se enteró</span>':'');
@@ -801,7 +802,9 @@ function envOrigenBloque(x,i){
   const pr=x.prendas||[];
   if(!pr.length) return '';
   const editable=['POR REVISAR','POR PEDIR','POR DESPACHAR'].includes(x.estado);
-  if(x.estado!=='POR REVISAR'){
+  // Abierto: lo nuevo por revisar y lo de bodega (según la página) que nadie ha confirmado, aunque sea de antes del cambio.
+  const sinMirar=x.estado==='POR DESPACHAR'&&!x.importacion&&!pr.some(p=>p.origen);
+  if(x.estado!=='POR REVISAR'&&!sinMirar){
     if(!editable||envOrigenAbierto!==x.id) return editable&&(x.estado==='POR PEDIR'||pr.some(p=>p.origen))?`<button class="btn-link" onclick="envOrigenAbierto='${esc(x.id)}';pintarEnvios()">Corregir bodega o importación</button>`:'';
   }
   const btn=(p,v,t)=>`<button class="${p.origen===v?'btn-ok':'btn-fs'}" aria-pressed="${p.origen===v}" onclick="envOrigen(${i},{${p.idx}:'${v}'})" ${envBusy?'disabled':''}>${t}</button>`;
