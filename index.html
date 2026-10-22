@@ -260,7 +260,6 @@ main{padding:14px 16px 24px;max-width:1300px;margin:0 auto}
     <div class="tabs">
       <button class="tab active" onclick="ir('envios',this)">Envíos</button>
       <button class="tab" onclick="ir('pedir',this)">Pedir a Pacho</button>
-      <button class="tab" onclick="ir('cola',this)">Importaciones</button>
       <button class="tab" onclick="ir('rotulos',this)">Rótulos</button>
       <button class="tab" id="tab-costos" onclick="ir('costos',this)">Costos</button>
       <button class="tab" id="tab-pacho" onclick="ir('pacho',this)">Pacho</button>
@@ -270,6 +269,7 @@ main{padding:14px 16px 24px;max-width:1300px;margin:0 auto}
 
     <div class="page active" id="pg-envios">
       <p class="pista"><b>Aquí avanzas cada pedido hasta que le llega al cliente.</b> Cada venta nueva llega en «Revisar bodega»: busca cada prenda y márcala. Desde «Por preparar», cada cambio le avisa al cliente por WhatsApp</p>
+      <div id="pendientes"></div>
       <div id="env-aviso"></div>
       <div class="fichas" id="env-fichas" role="tablist" aria-label="Filtrar por estado"></div>
       <input type="search" class="search" id="env-q" placeholder="Buscar cliente, producto, celular o guía..." oninput="pintarEnvios()" style="margin-bottom:10px"/>
@@ -293,36 +293,6 @@ main{padding:14px 16px 24px;max-width:1300px;margin:0 auto}
       </div>
       <div id="ped-lista"><div class="loading">Cargando...</div></div>
       <div class="pacho-barra" id="ped-barra" hidden></div>
-    </div>
-
-    <div class="page" id="pg-cola">
-      <p class="pista"><b>Aquí ves lo que le pediste a China y escribes observaciones.</b> El estado se cambia en Envíos y aquí se actualiza solo</p>
-      <div id="pendientes"></div>
-      <div class="fichas" id="fichas-estado" role="tablist" aria-label="Filtrar por estado"></div>
-      <input type="search" class="search" id="q" placeholder="Buscar cliente, producto o celular..." oninput="pintarCola()" style="margin-bottom:10px"/>
-      <details class="mas" id="mas-f">
-        <summary id="mas-t">📅 Fechas y más filtros</summary>
-        <div class="mas-c">
-          <div class="fechas">
-            <label>Pedido desde<input type="date" class="fi" id="f-desde" onchange="setFecha()"/></label>
-            <label>Pedido hasta<input type="date" class="fi" id="f-hasta" onchange="setFecha()"/></label>
-          </div>
-          <div class="rapidos" id="rapidos">
-            <button data-r="todo" class="on" onclick="rango('todo')">Todas las fechas</button>
-            <button data-r="7" onclick="rango('7')">Últimos 7 días</button>
-            <button data-r="30" onclick="rango('30')">Últimos 30 días</button>
-            <button data-r="mes" onclick="rango('mes')">Este mes</button>
-          </div>
-          <button class="btn-fs" id="b-pend" onclick="togglePend()" style="width:100%">Solo sin costo</button>
-        </div>
-      </details>
-      <div class="hdr" style="flex-direction:row;align-items:center;justify-content:space-between;margin-top:6px">
-        <span class="t" id="cola-n">Por entregar</span>
-        <button class="btn-fs" onclick="cargarCola()" aria-label="Actualizar la lista">↻ Actualizar</button>
-      </div>
-      <div class="resumen-f" id="resumen-f"></div>
-      <div id="lista"><div class="loading">Cargando...</div></div>
-      <div id="nota-oculta"></div>
     </div>
 
     <div class="page" id="pg-rotulos">
@@ -453,7 +423,7 @@ const API = 'https://script.google.com/macros/s/AKfycbzUL4cY9ZefOLfXfSgaNxgvl3xp
 
 let U='', P='';                 // credenciales de la sesión
 let pachoHasta='2026-10-30';     // Pacho cobra $15.000 por prenda solo por las ventas hasta este día
-let pedidos=[], soloPend=false, ch={}, cargando=false;
+let ch={};
 
 const $ = id => document.getElementById(id);
 const cop = v => '$' + Math.round(v||0).toLocaleString('es-CO');
@@ -503,7 +473,7 @@ function salir(){ U=P=''; $('app').style.display='none'; $('login').style.displa
 let pgActual='envios';
 async function actualizarActual(){
   const b=$('b-act'); b.disabled=true; b.style.opacity='.5';
-  const f={envios:cargarEnvios,pedir:cargarPedir,cola:cargarCola,rotulos:cargarRotulos,costos:cargarCostos,pacho:cargarPacho,deuda:cargarDeuda,ventas:cargarVentas}[pgActual];
+  const f={envios:cargarEnvios,pedir:cargarPedir,rotulos:cargarRotulos,costos:cargarCostos,pacho:cargarPacho,deuda:cargarDeuda,ventas:cargarVentas}[pgActual];
   try{ await f(); toast('Actualizado'); }catch(e){ toast('No se pudo actualizar','err'); }
   b.disabled=false; b.style.opacity='';
 }
@@ -514,7 +484,6 @@ function ir(pg,btn){
   $('pg-'+pg).classList.add('active'); btn.classList.add('active');
   if(pg==='envios') cargarEnvios();
   if(pg==='pedir') cargarPedir();
-  if(pg==='cola') cargarCola();
   if(pg==='rotulos') cargarRotulos();
   if(pg==='costos') cargarCostos();
   if(pg==='pacho') cargarPacho();
@@ -523,13 +492,8 @@ function ir(pg,btn){
 }
 
 // ============================================================
-// COLA DE PEDIDOS
-// Filtros (se cruzan entre sí): estado × rango de fechas del pedido × búsqueda × «solo sin costo».
-// Por defecto se ve «Por entregar» (todo lo abierto). Los ENTREGADOS no se muestran ni se cargan hasta
-// que se elige la ficha «Entregados»: así la lista de trabajo no se llena de lo ya resuelto.
-const ETQ={PEDIDO:'Pedido a China',TRANSITO:'En tránsito',LLEGO:'Ya llegó',ENTREGADO:'Entregado'};
-let entregados=[], entTotal=0, fEstado='ABIERTOS', fDesde='', fHasta='', rapido='todo';
-
+// PENDIENTES DE JUAN PABLO (arriba de Envíos). La pestaña «Importaciones» se quitó el 2026-10-22 (Andreu: «es
+// redundante»): el estado de cada pedido vive en Envíos y la deuda con Pacho en su pestaña.
 // ---- Pendientes de Juan Pablo: se calculan solos, se pueden marcar «Hecho» o cerrar ----
 // «Hecho» lo esconde hasta que el problema CREZCA (si hoy hay 14 sin costo y mañana 15, vuelve).
 // «Cerrar» lo esconde hasta mañana. Se guarda en este aparato (localStorage); si no hay, sigue visible.
@@ -540,10 +504,8 @@ function pendOcultar(k,modo,n){ const o=pendLeer(); o[k]={modo,n:n||0,dia:hoy()}
 let faltanCosto=0, ventaCero=0;
 function pintarPendientes(){
   const o=pendLeer();
-  const sinEst=pedidos.filter(x=>x.sinEstado).length;
   const items=[
     {k:'costos',n:faltanCosto,txt:`<b>${faltanCosto} pedido${faltanCosto===1?'':'s'} sin costo cargado.</b> Mientras falte la inversión y el envío, ese dinero no sube en tu saldo.`,go:'Cargar costos',fn:"ir('costos',$('tab-costos'));window.scrollTo(0,0)"},
-    {k:'estado',n:sinEst,txt:`<b>${sinEst} pedido${sinEst===1?'':'s'} sin estado definido.</b> Aparecen como «Pedido a China». Si ya van en camino o llegaron, cámbialos en cada tarjeta.`,go:'Ver cuáles',fn:"setEstado('SINESTADO');window.scrollTo(0,0)"},
     {k:'prueba-imp',n:1,fijo:true,txt:'<b>Prueba la impresión una vez con papel real:</b> 1 rótulo y luego 4. Mira que el borde punteado salga completo y que nada se corte.'}
   ].filter(i=>{
     if(!i.n) return false;
@@ -561,168 +523,6 @@ async function avisoCostos(){
     faltanCosto=r.faltan||0; pintarPendientes();
   }catch(e){}
 }
-async function cargarCola(){
-  avisoCostos();
-  $('lista').innerHTML='<div class="loading">Cargando...</div>';
-  try{
-    const verEnt=fEstado==='ENTREGADO';
-    const r=await get({action:'cola',entregados:verEnt});
-    if(r.error){ $('lista').innerHTML=`<div class="vacio">${esc(r.error)}</div>`; return; }
-    pedidos=r.pedidos||[]; sinLiq=r.sinLiquidar||0; entTotal=r.entregadosTotal||0; ventaCero=r.ventaCero||0; pintarPendientes();
-    if(verEnt) entregados=r.entregados||[];
-    pintarCola();
-  }catch(e){ $('lista').innerHTML='<div class="vacio">Error de conexión</div>'; }
-}
-let sinLiq=0;
-
-function setEstado(v){
-  fEstado=v;
-  if(v==='ENTREGADO') cargarCola(); else pintarCola();
-}
-function setFecha(){ fDesde=$('f-desde').value; fHasta=$('f-hasta').value; rapido=(fDesde||fHasta)?'':'todo'; pintarCola(); }
-function rango(k){
-  rapido=k; const h=hoy();
-  if(k==='todo'){ fDesde=''; fHasta=''; }
-  else if(k==='mes'){ fDesde=diaMes(0); fHasta=h; }
-  else { const d=new Date(); d.setDate(d.getDate()-Number(k)); fDesde=isoLocal(d); fHasta=h; }
-  $('f-desde').value=fDesde; $('f-hasta').value=fHasta;
-  pintarCola();
-}
-function limpiarFiltros(){
-  fEstado='ABIERTOS'; fDesde=''; fHasta=''; rapido='todo'; soloPend=false; $('q').value='';
-  $('f-desde').value=''; $('f-hasta').value='';
-  $('b-pend').style.background='none'; $('b-pend').style.color='var(--muted)';
-  pintarCola();
-}
-function togglePend(){
-  soloPend=!soloPend;
-  const b=$('b-pend');
-  b.style.background=soloPend?'var(--amber)':'none';
-  b.style.color=soloPend?'#000':'var(--muted)';
-  pintarCola();
-}
-
-function pintarCola(){
-  const q=($('q').value||'').toLowerCase();
-  const unidos=pedidos.filter(x=>x.pedidoId), sinUnir=pedidos.filter(x=>!x.pedidoId);
-  const n=k=>unidos.filter(x=>x.estado===k).length;
-  const chip=(v,t,c,extra='')=>`<button class="ficha ${extra} ${fEstado===v?'on':''}" role="tab" aria-selected="${fEstado===v}" onclick="setEstado('${v}')">${t} <b>${c}</b></button>`;
-  $('fichas-estado').innerHTML=
-    chip('ABIERTOS','Por entregar',unidos.length)+chip('PEDIDO','Pedido a China',n('PEDIDO'))+
-    chip('TRANSITO','En tránsito',n('TRANSITO'))+chip('LLEGO','Ya llegó',n('LLEGO'))+
-    chip('ENTREGADO','✓ Entregados',entTotal,'apar')+(sinUnir.length?chip('SINUNIR','Sin venta en Envíos',sinUnir.length,'apar'):'');
-  $('mas-t').textContent=(fDesde||fHasta||soloPend)?'📅 Filtros activos: '+[(fDesde||fHasta)?('pedidos '+(fDesde?'desde '+fFecha(fDesde):'')+(fDesde&&fHasta?' ':'')+(fHasta?'hasta '+fFecha(fHasta):'')):'',soloPend?'sin costo':''].filter(Boolean).join(' · '):'📅 Fechas y más filtros';
-  const on=document.querySelector('#fichas-estado .ficha.on'); if(on) on.scrollIntoView({inline:'center',block:'nearest'});
-  document.querySelectorAll('#rapidos button').forEach(b=>b.classList.toggle('on',b.dataset.r===rapido));
-
-  const verEnt=fEstado==='ENTREGADO';
-  let base=verEnt?entregados:(fEstado==='ABIERTOS'?unidos:fEstado==='SINUNIR'?sinUnir:fEstado==='SINESTADO'?pedidos.filter(x=>x.sinEstado):unidos.filter(x=>x.estado===fEstado));
-  let l=base;
-  if(fDesde) l=l.filter(x=>x.fecha&&x.fecha>=fDesde);
-  if(fHasta) l=l.filter(x=>x.fecha&&x.fecha<=fHasta);
-  if(q) l=l.filter(x=>(x.persona||'').toLowerCase().includes(q)||(x.producto||'').toLowerCase().includes(q)||(x.numero||'').includes(q));
-  if(soloPend) l=l.filter(x=>!x.liquidado);
-
-  const titulo=verEnt?'Entregados':(fEstado==='ABIERTOS'?'Por entregar':fEstado==='SINUNIR'?'Sin venta en Envíos':fEstado==='SINESTADO'?'Sin estado':ETQ[fEstado]);
-  $('cola-n').textContent=`${titulo} (${l.length})`;
-  const filtrado=!!(fDesde||fHasta||q||soloPend||fEstado!=='ABIERTOS');
-  const partes=[titulo];
-  if(fDesde||fHasta) partes.push(`pedidos ${fDesde?'desde '+fFecha(fDesde):''}${fDesde&&fHasta?' ':''}${fHasta?'hasta '+fFecha(fHasta):''}`);
-  if(soloPend) partes.push('sin costo');
-  if(q) partes.push(`«${esc(q)}»`);
-  $('resumen-f').innerHTML=filtrado?`<span>Viendo: ${partes.join(' · ')}</span><button onclick="limpiarFiltros()">Quitar filtros</button>`:
-    `<span>${pedidos.filter(x=>x.usaPacho).length} con Pacho</span>`;
-
-  // Pista permanente: los entregados existen pero están ocultos.
-  $('nota-oculta').innerHTML=(!verEnt&&entTotal)?`<div class="oculto-nota"><span>✓ <b>${entTotal} pedidos ya entregados</b> no se muestran para que tu lista quede limpia.</span><button onclick="setEstado('ENTREGADO');window.scrollTo({top:0,behavior:'smooth'})">Verlos</button></div>`:'';
-
-  if(!l.length){
-    const msg=verEnt?(entregados.length?'Ningún entregado coincide con los filtros.':'Todavía no hay pedidos entregados.')
-      :(pedidos.length?'Ningún pedido coincide con los filtros.':'No hay pedidos pendientes. Todo entregado. 🎉');
-    $('lista').innerHTML=`<div class="vacio"><div class="big">${verEnt?'📦':'✅'}</div><div>${msg}</div>${filtrado?'<div style="margin-top:14px"><button class="btn-fs" onclick="limpiarFiltros()">Quitar filtros</button></div>':''}</div>`;
-    return;
-  }
-
-  const banner=verEnt?'<div class="aviso info">Estás viendo pedidos <b>ya entregados</b>. Son solo para consultar: no se pueden editar desde aquí.</div>':'';
-  $('lista').innerHTML=banner+l.map(x=>{
-    const i=pedidos.indexOf(x);
-    const wa=x.numero?`https://wa.me/57${encodeURIComponent(x.numero.replace(/^57/,''))}`:null;
-    const waBtn=wa?`<a class="btn-wa" href="${wa}" target="_blank" rel="noopener">WhatsApp</a>`:'';
-    if(verEnt) return `<div class="pedido hecho">
-      <div class="ptop">
-        <div style="flex:1;min-width:0">
-          <div class="pprod">${esc(x.producto||'(sin producto)')}<span class="chip chip-ok">Entregado ${fFecha(x.entregadoEl)}</span>${x.usaPacho?'<span class="chip chip-pacho">Pacho</span>':''}</div>
-          <div class="pmeta">${esc(x.persona||'—')} · pedido ${fFecha(x.fecha)}${x.numero?' · '+esc(x.numero):''}</div>
-          ${x.obs?`<div class="pmeta">${esc(obsTxt(x.obs))}</div>`:''}
-        </div>
-        ${x.sinPlata?'':`<div class="pmoney"><b>${cop(x.venta)}</b>${x.liquidado?`costo ${cop(x.compra)} · envío ${cop(x.envio)}`:'sin costo cargado'}</div>`}
-      </div>
-      ${waBtn?`<div class="pctrl">${waBtn}</div>`:''}
-    </div>`;
-    return `<div class="pedido ${x.liquidado?'listo':'pend'}">
-      <div class="ptop">
-        <div style="flex:1;min-width:0">
-          <div class="pprod">${esc(x.producto||'(sin producto)')}
-            ${!x.liquidado?'<span class="chip chip-pend">sin costo</span>':''}
-            ${x.usaPacho?'<span class="chip chip-pacho">Pacho</span>':''}
-            ${x.pedidoId?`<span class="chip chip-shop">Envíos #${esc(x.pedidoId)}: ${esc(EST_TXT[x.estadoEnvios]||'')}</span>`:''}
-          </div>
-          <div class="pmeta">${esc(x.persona||'—')} · ${x.fechaCompra?'compró '+fFecha(x.fechaCompra)+' · ':''}pedido ${fFecha(x.fecha)}${x.usaPacho?(x.pachoPagado?' · pagado a Pacho'+(x.pagadoEl?' '+fFecha(x.pagadoEl):''):' · sin pagar a Pacho'):''}${x.numero?' · '+esc(x.numero):''}</div>
-        </div>
-        ${x.sinPlata?'':`<div class="pmoney">
-          <b>${cop(x.venta)}</b>
-          ${x.liquidado?`costo ${cop(x.compra)} · envío ${cop(x.envio)}`:'costo pendiente'}
-        </div>`}
-      </div>
-      <div class="pctrl">
-        ${x.pedidoId?'':'<div class="aviso" style="margin:0">No encontré su venta en Envíos (otro nombre o fecha), así que su estado no se mueve solo. Cuando le llegue al cliente, ciérrala aquí</div>'}
-        <input class="obs" placeholder="Observación..." aria-label="Observación" value="${esc(obsTxt(x.obs))}" onchange="cambiarObs(${i},this.value)">
-        <div class="fila">${waBtn}${x.pedidoId?'':`<button class="btn-ok" onclick="entregar(${i})">Ya se entregó</button>`}</div>
-      </div>
-    </div>`;
-  }).join('');
-}
-
-// Los cambios van en fila: si el anterior todavía se está guardando, este espera su turno
-// (antes se botaba en silencio y la pantalla lo mostraba como guardado).
-let colaGuardar=Promise.resolve();
-function guardar(i,campos,msg){
-  const x=pedidos[i]; if(!x) return;
-  colaGuardar=colaGuardar.then(()=>guardarYa(x,campos,msg));
-  return colaGuardar;
-}
-async function guardarYa(x,campos,msg){
-  cargando=true;
-  try{
-    const r=await post({action:'actualizar',fila:x.fila,numero:x.numero,producto:x.producto,...campos});
-    if(r.error){ toast(r.error,'err'); await cargarCola(); return; }
-    Object.assign(x,campos);
-    toast((msg||'Guardado')+avisoEnvio(r));
-    if(r.envio&&campos.estado) await cargarCola();
-  }catch(e){ toast('No se pudo guardar. Revisa tu internet.','err'); }
-  finally{ cargando=false; }
-}
-// El estado también se guarda en Envíos: si salió WhatsApp al cliente, Juan Pablo lo ve aquí.
-function avisoEnvio(r){
-  const w=r&&r.envio&&r.envio.whatsapp;
-  if(!w||!w.aplica) return r&&r.envio?' · también en Envíos':'';
-  return w.enviado?' · WhatsApp al cliente ✓':' · el WhatsApp no salió: búscalo en Envíos para llamarlo';
-}
-function cambiarObs(i,v){ guardar(i,{obs:v},'Observación guardada'); }
-
-async function entregar(i){
-  const x=pedidos[i]; if(!x) return;
-  if(!confirm(`¿Marcar como ENTREGADO?\n\n${x.producto}\n${x.persona}\n\nSale de tu lista, pero queda guardado en el histórico.`)) return;
-  await colaGuardar; // primero termina lo que se estaba guardando
-  cargando=true;
-  try{
-    const r=await post({action:'entregar',fila:x.fila,numero:x.numero,producto:x.producto});
-    if(r.error){ toast(r.error,'err'); }
-    else toast('Entregado ✓'+avisoEnvio(r));
-  }catch(e){ toast('No se pudo guardar','err'); }
-  finally{ cargando=false; await cargarCola(); }
-}
-
 // ============================================================
 // ENVÍOS — el estado de cada pedido, uno por uno, desde el celular.
 // Lo que es de la página (Shopify) le llega a Shopify al guardar: «preparando», «despachado» (con la guía,
@@ -1230,7 +1030,7 @@ async function cargarPedir(){
     const r=await get({action:'pedir_pacho'});
     if(r.error){ $('ped-lista').innerHTML=`<div class="vacio">${esc(r.error)}</div>`; return; }
     pedL=(r.lineas||[]).map(x=>({...x,obs:''}));
-    pedSel=new Set(pedL.filter(x=>x.talla).map(x=>x.llave));   // lo que no tiene talla (llaveros, gorras) se elige a mano
+    pedSel=new Set();   // Andreu (2026-10-22): se eligen una por una («la 1 y la 3»); «Elegir todas» si son todas
     $('ped-aviso').innerHTML=r.avisoFotos?`<div class="aviso">No pude traer las fotos de Shopify: ${esc(r.avisoFotos)} El PDF sale sin foto.</div>`:'';
     pintarPedir();
   }catch(e){ $('ped-lista').innerHTML='<div class="vacio">Error de conexión</div>'; }
