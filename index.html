@@ -165,6 +165,11 @@ main{padding:14px 16px 24px;max-width:1300px;margin:0 auto}
 .env-form label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted)}
 .env-form .bt{display:flex;gap:8px;flex-wrap:wrap}.env-form .bt>*{flex:1 1 140px}
 .env-foto img{display:block;max-width:100%;max-height:70vh;border-radius:10px;margin-top:8px}
+.psel{display:flex;align-items:center;gap:10px;min-height:44px;font-size:14px;color:var(--text);cursor:pointer}
+.psel input{width:22px;height:22px;accent-color:#c084fc}
+.pacho-barra{position:sticky;bottom:0;margin:12px -16px 0;padding:12px 16px calc(12px + env(safe-area-inset-bottom));background:var(--surface);border-top:1px solid var(--border);display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.pacho-barra b{flex:1 1 100%;font-size:14px}
+.pacho-barra button{flex:1 1 140px}
 .btn-link{background:none;border:none;color:#8ab8f0;font-size:13px;cursor:pointer;min-height:36px;padding:0;text-decoration:underline}
 /* ---- computador: solo agranda ---- */
 @media(min-width:700px){
@@ -368,6 +373,7 @@ main{padding:14px 16px 24px;max-width:1300px;margin:0 auto}
         </div>
       </div>
       <div id="pacho-lista"></div>
+      <div class="pacho-barra" id="pacho-barra" hidden></div>
     </div>
 
     <div class="page" id="pg-deuda">
@@ -1118,7 +1124,7 @@ async function cargarPacho(){
     const r=await get({action:'pacho'});
     if(r.error){ $('c-pacho').innerHTML=`<div class="loading">${esc(r.error)}</div>`; return; }
     const m=r.meses||[];
-    pachoPed=r.pedidos||[]; pintarPachoLista();
+    pachoPed=r.pedidos||[]; pachoSel=new Set(); pintarPachoLista();
     if(!$('pacho-hasta').value) $('pacho-hasta').value=new Date().toLocaleDateString('en-CA');
     const act=m.length?m[m.length-1]:null, ant=m.length>1?m[m.length-2]:null;
     let tend='—', clase='';
@@ -1154,12 +1160,13 @@ async function cargarPacho(){
 
 // Pago a Pacho (2026-10-05): pedido por pedido o «todo hasta tal fecha», entregados incluidos.
 // El servidor revisa cada pedido y el total antes de escribir: si algo cambió, no marca nada.
-let pachoPed=[], pachoBusy=false;
+let pachoPed=[], pachoBusy=false, pachoSel=new Set();
 function pintarPachoLista(){
   const q=($('pacho-q').value||'').toLowerCase(), f=$('pacho-f').value;
   const l=pachoPed.map((x,i)=>({x,i})).filter(o=>(!f||(f==='SI')===o.x.pagado)&&
     (!q||(o.x.persona||'').toLowerCase().includes(q)||(o.x.producto||'').toLowerCase().includes(q)));
   $('pacho-n').textContent=`${f==='NO'?'Sin pagar':f==='SI'?'Pagados':'Todos'} (${l.length}) · ${cop(l.reduce((s,o)=>s+o.x.valor,0))}`;
+  pachoVisibles=l.filter(o=>!o.x.pagado).map(o=>o.i);
   $('pacho-lista').innerHTML=l.length?l.map(({x,i})=>`<div class="pedido ${x.pagado?'listo':'pend'}">
     <div class="ptop">
       <div style="flex:1;min-width:0">
@@ -1168,8 +1175,28 @@ function pintarPachoLista(){
       </div>
       <div class="pmoney"><b>${cop(x.valor)}</b>${x.pagado?'pagado':'sin pagar'}</div>
     </div>
-    <button class="${x.pagado?'btn-fs':'btn-ok'}" onclick="pachoPagarUno(${i})">${x.pagado?'Quitar pago':'Marcar pagado'}</button>
+    ${x.pagado?`<button class="btn-fs" onclick="pachoPagarUno(${i})">Quitar pago</button>`
+      :`<label class="psel"><input type="checkbox" ${pachoSel.has(i)?'checked':''} onchange="pachoElegir(${i},this.checked)"> Elegir para pagar</label>`}
   </div>`).join(''):'<div class="vacio"><div>No hay pedidos con ese filtro.</div></div>';
+  pintarPachoBarra();
+}
+// Varios a la vez: se eligen con la casilla y se pagan juntos desde la barra de abajo.
+let pachoVisibles=[];
+function pachoElegir(i,on){ if(on) pachoSel.add(i); else pachoSel.delete(i); pintarPachoBarra(); }
+function pachoTodos(){ const todos=pachoVisibles.every(i=>pachoSel.has(i)); pachoVisibles.forEach(i=>todos?pachoSel.delete(i):pachoSel.add(i)); pintarPachoLista(); }
+function pintarPachoBarra(){
+  const b=$('pacho-barra'), l=[...pachoSel].map(i=>pachoPed[i]).filter(x=>x&&!x.pagado);
+  b.hidden=!pachoVisibles.length;
+  if(b.hidden) return;
+  const todos=pachoVisibles.length&&pachoVisibles.every(i=>pachoSel.has(i));
+  b.innerHTML=`<b>${l.length?`${l.length} elegido${l.length===1?'':'s'} · ${cop(l.reduce((s,x)=>s+x.valor,0))}`:'Elige los que le vas a pagar'}</b>
+    <button class="btn-fs" onclick="pachoTodos()">${todos?'Quitar todos':'Elegir todos'}</button>
+    <button class="btn-ok" onclick="pachoPagarElegidos()" ${l.length?'':'disabled'}>Pagar elegidos</button>`;
+}
+function pachoPagarElegidos(){
+  const lista=[...pachoSel].map(i=>pachoPed[i]).filter(x=>x&&!x.pagado);
+  if(!lista.length) return;
+  pachoMarcar(lista,true,`¿Marcar como PAGADOS a Pacho ${lista.length} pedido${lista.length===1?'':'s'}, por ${cop(lista.reduce((s,x)=>s+x.valor,0))}?`);
 }
 async function pachoMarcar(lista,pagado,pregunta){
   if(pachoBusy||!lista.length) return;
