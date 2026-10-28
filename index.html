@@ -327,7 +327,6 @@ button,a,label,select,input,textarea,.tab,.ficha{touch-action:manipulation}
         <span id="rot-resumen" style="font-size:14px;color:var(--muted)"></span>
         <div class="acc">
           <button class="btn-fs" onclick="rotCambiar('POR DESPACHAR')">Ya llegó / reabrir</button>
-          <button class="btn-fs" onclick="rotCambiar('ENTREGADO')">Ya se entregó</button>
           <button class="btn-primary" id="rot-btn" onclick="rotImprimir()">Imprimir</button>
         </div>
       </div>
@@ -542,7 +541,7 @@ async function avisoCostos(){
 const EST_ENV=[['POR REVISAR','Revisar bodega'],['POR PEDIR','Por pedir a Pacho'],['EN CHINA','Pedido a China'],['EN CAMINO','Viene para Colombia'],['POR DESPACHAR','Por preparar'],['PREPARANDO','Preparando'],['DESPACHADO','Despachado'],['ENTREGADO','Entregado']];
 const EST_TXT=Object.fromEntries(EST_ENV);
 const SHOP_TXT={UNFULFILLED:'sin preparar',OPEN:'sin preparar',IN_PROGRESS:'en preparación',FULFILLED:'enviado',PARTIALLY_FULFILLED:'enviado en parte',ON_HOLD:'en espera',SCHEDULED:'programado',PENDING_FULFILLMENT:'pendiente'};
-let envios=[], envF='HACER', envForm=null, envBusy=false, envTrans=['Interrapidísimo'];
+let envios=[], envF='ABIERTOS', envForm=null, envBusy=false, envTrans=['Interrapidísimo'];
 
 async function cargarEnvios(){
   $('env-lista').innerHTML='<div class="loading">Cargando...</div>';
@@ -555,17 +554,18 @@ async function cargarEnvios(){
   }catch(e){ $('env-lista').innerHTML='<div class="vacio">Error de conexión</div>'; }
 }
 
-const envGrupo={HACER:['POR REVISAR','POR DESPACHAR','PREPARANDO'],'POR PEDIR':['POR PEDIR'],'EN CHINA':['EN CHINA'],'EN CAMINO':['EN CAMINO'],DESPACHADO:['DESPACHADO'],ENTREGADO:['ENTREGADO']};
+// Abiertos (por defecto): todo lo que Juan Pablo aún mueve. Despachado y Entregado solo con su ficha (Andreu, 2026-10-28).
+const envGrupo={ABIERTOS:['POR REVISAR','POR PEDIR','EN CHINA','EN CAMINO','POR DESPACHAR','PREPARANDO'],HACER:['POR REVISAR','POR DESPACHAR','PREPARANDO'],'POR PEDIR':['POR PEDIR'],'EN CHINA':['EN CHINA'],'EN CAMINO':['EN CAMINO'],DESPACHADO:['DESPACHADO'],ENTREGADO:['ENTREGADO']};
 function envFiltro(v){ envF=v; envForm=null; pintarEnvios(); }
 
 function pintarEnvios(){
   const n=k=>envios.filter(x=>envGrupo[k].includes(x.estado)).length;
   const chip=(v,t)=>`<button class="ficha ${envF===v?'on':''}" role="tab" aria-selected="${envF===v}" onclick="envFiltro('${v}')">${t} <b>${n(v)}</b></button>`;
-  $('env-fichas').innerHTML=chip('HACER','Por hacer')+chip('POR PEDIR','Por pedir a Pacho')+chip('EN CHINA','Pedido a China')+chip('EN CAMINO','Viene para Colombia')+chip('DESPACHADO','Despachados')+chip('ENTREGADO','Entregados');
+  $('env-fichas').innerHTML=chip('ABIERTOS','Abiertos')+chip('HACER','Por hacer')+chip('POR PEDIR','Por pedir a Pacho')+chip('EN CHINA','Pedido a China')+chip('EN CAMINO','Viene para Colombia')+chip('DESPACHADO','Despachados')+chip('ENTREGADO','Entregados');
   const q=($('env-q').value||'').toLowerCase().trim();
   let l=q?envios:envios.filter(x=>envGrupo[envF].includes(x.estado));   // la búsqueda mira todos los estados
   if(q) l=l.filter(x=>[x.persona,x.producto,x.numero,x.guia,x.id,x.shopify&&x.shopify.pedido].some(v=>String(v||'').toLowerCase().includes(q)));
-  $('env-n').textContent=(q?'Resultados':{HACER:'Por hacer','POR PEDIR':'Por pedir a Pacho','EN CHINA':'Pedido a China','EN CAMINO':'Viene para Colombia',DESPACHADO:'Despachados',ENTREGADO:'Entregados'}[envF])+` (${l.length})`;
+  $('env-n').textContent=(q?'Resultados':{ABIERTOS:'Abiertos',HACER:'Por hacer','POR PEDIR':'Por pedir a Pacho','EN CHINA':'Pedido a China','EN CAMINO':'Viene para Colombia',DESPACHADO:'Despachados',ENTREGADO:'Entregados'}[envF])+` (${l.length})`;
   if(!l.length){ $('env-lista').innerHTML=`<div class="vacio"><div class="big">✅</div><div>${q?'Ningún pedido coincide.':'No hay pedidos aquí.'}</div></div>`; return; }
   $('env-lista').innerHTML=l.map(envTarjeta).join('');
 }
@@ -606,7 +606,7 @@ function envTarjeta(x){
 
 // Bodega o importación, prenda por prenda (Andreu, 2026-10-22): la regla de la página no siempre acierta.
 // Con todas marcadas el pedido se mueve solo: todo en bodega → Por preparar; alguna de importación → Pedir a Pacho.
-const EST_AUTO=['POR REVISAR','POR PEDIR'];
+const EST_AUTO=['POR REVISAR','POR PEDIR','ENTREGADO'];   // Entregado lo pone el servidor a los 4 días de despachado
 let envOrigenAbierto=null;
 function envOrigenBloque(x,i){
   const pr=x.prendas||[];
