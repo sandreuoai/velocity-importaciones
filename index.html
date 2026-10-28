@@ -221,6 +221,16 @@ main{padding:14px 16px 24px;max-width:1300px;margin:0 auto}
 @media(min-width:900px){
   .row2{grid-template-columns:1fr 1fr}
 }
+/* vs-mobile-first: cero desborde horizontal de página; lo ancho hace scroll dentro de su caja; nada salta al tocar */
+html{overflow-x:hidden;overscroll-behavior-x:none}
+body{overflow-x:hidden;max-width:100vw;overscroll-behavior-x:none}
+canvas{max-width:100% !important}
+main,.page,.card,.chart-card,.row2>*,.cards>*{min-width:0}
+.tabs,.fichas,.rapidos{overscroll-behavior-x:contain}
+button,a,label,select,input,textarea,.tab,.ficha{touch-action:manipulation}
+.rapidos button,.resumen-f button,.oculto-nota button,.btn-link{min-height:var(--toque)}
+/* iOS acerca la pantalla si un campo tiene letra bajo 16px, también en iPad */
+.fi,.search,.sel,.pctrl .obs,input,select,textarea{font-size:16px}
 #hoja-impresion{display:none}
 @page{size:letter;margin:0}
 @media print{
@@ -572,7 +582,7 @@ function envTarjeta(x){
     +(x.shopifyAviso?'<span class="chip chip-err">Shopify no se enteró</span>':'');
   const guia=x.guia?`<div class="env-guia">Guía <b>${esc(x.guia)}</b> · ${esc(x.transportadora)}${x.despachadoEl?' · salió '+esc(x.despachadoEl):''}${x.entregadoEl?' · llegó '+esc(x.entregadoEl):''}</div>`:'';
   const foto=x.tieneFoto?`<button class="btn-link" onclick="envVerFoto(${i})">Ver foto de la guía</button><div class="env-foto" id="env-foto-${i}"></div>`
-    :(x.guia?`<label class="btn-link" style="display:inline-flex;align-items:center">Subir foto de la guía<input type="file" accept="image/*" capture="environment" hidden onchange="envSubirFoto(${i},this)"></label>`:'');
+    :(x.guia?`<label class="btn-link" style="display:inline-flex;align-items:center">Subir foto de la guía<input type="file" accept="image/*" hidden onchange="envSubirFoto(${i},this)"></label>`:'');
   const aviso=x.shopifyAviso?`<div class="aviso" style="margin:0">Shopify: ${esc(x.shopifyAviso)}<div style="margin-top:8px"><button class="btn-fs" onclick="envGuardar(${i},'${x.estado}')">Reintentar en Shopify</button></div></div>`:'';
   const wa=envWa(x,i);
   const form=envForm===x.id?envFormulario(x,i):'';
@@ -637,7 +647,7 @@ function envFormulario(x,i){
   return `<div class="env-form">
     <label>Transportadora<select class="sel" id="env-t">${envTrans.map(v=>`<option${v===t?' selected':''}>${esc(v)}</option>`).join('')}</select></label>
     <label>Número de guía<input class="obs" id="env-g" inputmode="text" autocomplete="off" value="${esc(x.guia||'')}" placeholder="Ej: 240012345678"></label>
-    <label class="btn-fs" style="display:flex;align-items:center;justify-content:center;flex-direction:row;color:var(--text)">Tomar foto de la guía<input type="file" id="env-f" accept="image/*" capture="environment" hidden onchange="this.parentNode.firstChild.textContent=this.files[0]?'Foto lista ✓ · toca para cambiarla':'Tomar foto de la guía'"></label>
+    <label class="btn-fs" style="display:flex;align-items:center;justify-content:center;flex-direction:row;color:var(--text)">Foto de la guía (opcional)<input type="file" id="env-f" accept="image/*" hidden onchange="this.parentNode.firstChild.textContent=this.files[0]?'Foto lista ✓ · toca para cambiarla':'Foto de la guía (opcional)'"></label>
     <div class="bt"><button class="btn-ok" id="env-ok" onclick="envDespachar(${i})">Guardar despacho</button><button class="btn-fs" onclick="envForm=null;pintarEnvios()">Cancelar</button></div>
   </div>`;
 }
@@ -659,7 +669,6 @@ async function envDespachar(i){
   if(!/^[0-9A-Z-]{4,30}$/.test(guia)){ toast('Escribe el número de guía','err'); $('env-g').focus(); return; }
   let foto=null;
   if(f){ try{ foto=await envComprimir(f); }catch(e){ toast('La foto no se pudo leer. Tómala otra vez.','err'); return; } }
-  else if(!x.tieneFoto){ toast('Toma la foto de la guía: le llega al cliente con el WhatsApp','err'); return; }
   $('env-ok').disabled=true;
   await envGuardar(i,'DESPACHADO',{guia,transportadora:trans,foto});
 }
