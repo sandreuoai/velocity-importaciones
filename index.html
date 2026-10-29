@@ -431,7 +431,7 @@ button,a,label,select,input,textarea,.tab,.ficha{touch-action:manipulation}
 const API = 'https://script.google.com/macros/s/AKfycbzUL4cY9ZefOLfXfSgaNxgvl3xpIarZgktKqAxn5Cyi6ATd2a46vCLeP51itaIn6xM6/exec';
 
 let U='', P='';                 // credenciales de la sesión
-let pachoHasta='2026-10-30';     // Pacho cobra $15.000 por prenda solo por las ventas hasta este día
+let pachoHasta='2026-10-31';     // Pacho cobra $15.000 por prenda solo por las ventas hasta este día
 let ch={};
 
 const $ = id => document.getElementById(id);
@@ -570,6 +570,16 @@ function pintarEnvios(){
   $('env-lista').innerHTML=l.map(envTarjeta).join('');
 }
 
+// Fecha que se le prometió al cliente (Andreu, 2026-10-29): la calcula el servidor (fechaLimite: importación 25 días,
+// bodega 4 hábiles). Rojo si ya pasó, amarillo si faltan 3 días o menos. Despachado o entregado ya no corre.
+function plazoChip(limite,estado){
+  if(!limite||['DESPACHADO','ENTREGADO'].includes(estado)) return '';
+  const n=Math.round((new Date(limite+'T12:00:00')-new Date(hoy()+'T12:00:00'))/864e5);
+  const cls=n<0?'chip-err':n<=3?'chip-pend':'chip-ok';
+  const cuanto=n<0?`atrasado ${-n} día${n===-1?'':'s'}`:n===0?'es hoy':`faltan ${n} día${n===1?'':'s'}`;
+  return `<span class="chip ${cls}">Llega al cliente a más tardar el ${fFecha(limite)} · ${cuanto}</span>`;
+}
+
 function envClase(e){ return ['POR PEDIR','EN CHINA','EN CAMINO'].includes(e)?'env-espera':e==='POR DESPACHAR'||e==='POR REVISAR'?'env-hacer':e==='PREPARANDO'?'env-prep':'env-ok'; }
 
 function envTarjeta(x){
@@ -579,7 +589,8 @@ function envTarjeta(x){
       :(x.prendas||[]).length&&(x.prendas||[]).every(p=>p.origen==='B')?'<span class="chip chip-ok">en bodega</span>':'')
     +(s?`<span class="chip chip-shop">Shopify ${esc(s.pedido)}${s.cancelado?': cancelado':s.estado?': '+esc(SHOP_TXT[s.estado]||s.estado.toLowerCase()):''}</span>`:'')
     +(x.canal==='SHOPIFY'&&!s&&!x.shopifyPedido?'<span class="chip chip-pend">sin unir a Shopify</span>':'')
-    +(x.shopifyAviso?'<span class="chip chip-err">Shopify no se enteró</span>':'');
+    +(x.shopifyAviso?'<span class="chip chip-err">Shopify no se enteró</span>':'')
+    +plazoChip(x.limite,x.estado);
   const guia=x.guia?`<div class="env-guia">Guía <b>${esc(x.guia)}</b> · ${esc(x.transportadora)}${x.despachadoEl?' · salió '+esc(x.despachadoEl):''}${x.entregadoEl?' · llegó '+esc(x.entregadoEl):''}</div>`:'';
   const foto=x.tieneFoto?`<button class="btn-link" onclick="envVerFoto(${i})">Ver foto de la guía</button><div class="env-foto" id="env-foto-${i}"></div>`
     :(x.guia?`<label class="btn-link" style="display:inline-flex;align-items:center">Subir foto de la guía<input type="file" accept="image/*" hidden onchange="envSubirFoto(${i},this)"></label>`:'');
@@ -591,7 +602,7 @@ function envTarjeta(x){
     <div class="ptop"><div style="flex:1;min-width:0">
       <div class="pprod">${esc(rotItems(x.producto).join(' · ')||'(sin producto)')}</div>
       <div>${chips}</div>
-      <div class="pmeta">${esc(x.persona||'—')} · ${esc(x.ciudad||'sin ciudad')} · ${fFecha(x.fecha)} · #${esc(x.id)}${x.numero?' · '+esc(x.numero):''}</div>
+      <div class="pmeta">${esc(x.persona||'—')} · ${esc(x.ciudad||'sin ciudad')} · vendido ${fFecha(x.fecha)} · #${esc(x.id)}${x.numero?' · '+esc(x.numero):''}</div>
       ${guia}${foto}
     </div></div>
     <div class="pctrl">
@@ -1061,6 +1072,7 @@ function pintarPedir(){
           <div class="pprod">${esc(x.titulo)}</div>
           <div style="margin:6px 0"><span class="ped-talla">${esc(x.talla||'Única')}</span>${x.opciones?`<span class="pmeta">${esc(x.opciones)}</span>`:''}</div>
           <div class="pmeta">${esc(x.persona||'—')} · compró ${fFecha(x.fecha)} · #${esc(x.id)}${x.canal==='SHOPIFY'?' · página':''}</div>
+          <div>${plazoChip(x.limite,'')}</div>
         </div>
       </div>
       <div class="pctrl">
