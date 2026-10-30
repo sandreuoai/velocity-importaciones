@@ -963,7 +963,7 @@ function pintarCostos(){
     <div class="ptop">
       <div style="flex:1;min-width:0">
         <div class="pprod">${esc(x.producto)}${x.falta?'<span class="chip chip-pend">sin costo</span>':''}${x.importacion?'<span class="chip chip-pacho">importación</span>':''}</div>
-        <div class="pmeta">${esc(x.persona||'—')} · ${fFecha(x.fecha)} · #${esc(x.id)}</div>
+        <div class="pmeta">${esc(x.persona||'—')} · ${esc(x.ciudad||'sin ciudad')} · ${fFecha(x.fecha)} · #${esc(x.id)}</div>
       </div>
       <div class="pmoney"><b>${cop(x.venta)}</b>vendido</div>
     </div>
@@ -973,8 +973,23 @@ function pintarCostos(){
         <label class="chk" style="flex-direction:column;align-items:stretch;gap:4px;min-height:0">Envío <input class="obs" id="ce-${i}" inputmode="numeric" placeholder="ej. 25000" value="${x.envio>0?x.envio:''}"></label>
       </div>
       <button class="btn-ok" onclick="costoGuardar(${i})">Guardar</button>
+      <button class="btn-fs" onclick="costoDevolucion(${i})">Marcar como devolución</button>
     </div>
   </div>`).join('');
+}
+
+async function costoDevolucion(i){
+  const x=costos[i]; if(!x||costosBusy) return;
+  if(!confirm(`¿El pedido #${x.id} (${x.producto}) es una devolución?\n\nSale de las ventas, de la ganancia y de tu saldo, y ya no pide costo.`)) return;
+  costosBusy=true;
+  try{
+    const r=await post({action:'costo_devolucion',id:x.id});
+    if(r.error){ toast(r.error,'err'); return; }
+    costos.splice(i,1); avisoCostos();
+    toast('Marcado como devolución. Llega al panel de Andreu en la próxima sincronización.');
+  }catch(e){ toast('No se pudo guardar. Revisa tu internet.','err'); return; }
+  finally{ costosBusy=false; }
+  pintarCostos();
 }
 
 async function costoGuardar(i){
