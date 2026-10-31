@@ -1004,8 +1004,8 @@ function pintarCostos(){
     </div>
     <div class="pctrl">
       <div class="fila">
-        <label class="chk" style="flex-direction:column;align-items:stretch;gap:4px;min-height:0">Inversión (la prenda) <input class="obs" id="ci-${i}" inputmode="numeric" placeholder="ej. 85000" value="${x.inversion>0?x.inversion:''}"></label>
-        <label class="chk" style="flex-direction:column;align-items:stretch;gap:4px;min-height:0">Envío <input class="obs" id="ce-${i}" inputmode="numeric" placeholder="ej. 25000" value="${x.envio>0?x.envio:''}"></label>
+        <label class="chk" style="flex-direction:column;align-items:stretch;gap:4px;min-height:0">Inversión (la prenda) <input class="obs" id="ci-${i}" data-cop inputmode="numeric" placeholder="ej. 85000" value="${x.inversion>0?x.inversion:''}"></label>
+        <label class="chk" style="flex-direction:column;align-items:stretch;gap:4px;min-height:0">Envío <input class="obs" id="ce-${i}" data-cop inputmode="numeric" placeholder="ej. 25000" value="${x.envio>0?x.envio:''}"></label>
       </div>
       <button class="btn-ok" onclick="costoGuardar(${i})">Guardar</button>
       <button class="btn-fs" onclick="costoDevolucion(${i})">Marcar como devolución</button>
@@ -1335,7 +1335,7 @@ function regAbrir(i){ regAbierta=ventasReg[i]&&ventasReg[i].id; pintarRegistro()
 function regForm(x,i){
   return `<div class="pctrl">${REG_CAMPOS.map(([k,t])=>`<label class="chk" style="flex-direction:column;align-items:stretch;gap:4px;min-height:0">${t}
     ${k==='producto'||k==='notas'?`<textarea class="obs" id="rg-${k}" rows="2">${esc(x[k])}</textarea>`
-      :`<input class="obs" id="rg-${k}" ${k==='venta'||k==='cel'||k==='cedula'?'inputmode="numeric"':''} value="${esc(k==='venta'?(x.venta||''):x[k])}">`}</label>`).join('')}
+      :`<input class="obs" id="rg-${k}" ${k==='venta'?'data-cop ':''}${k==='venta'||k==='cel'||k==='cedula'?'inputmode="numeric"':''} value="${esc(k==='venta'?(x.venta||''):x[k])}">`}</label>`).join('')}
     <div class="bt"><button class="btn-ok" onclick="regGuardar(${i})">Guardar</button><button class="btn-fs" onclick="regAbierta=null;pintarRegistro()">Cancelar</button></div></div>`;
 }
 function regGuardar(i){
@@ -1417,6 +1417,26 @@ function rank(el,items,nf,vf,sf,color){
     <div class="rkbw"><div class="rkb" style="width:${Math.round(sf(x)/max*100)}%;background:${color}"></div></div>
     <span class="rkv">${esc(vf(x))}</span></li>`).join('');
 }
+
+// Campos de plata con «$» y puntos de miles mientras se escribe (Andreu, 2026-10-30: «si no, se confunde uno»).
+// .value sigue devolviendo solo el número (con «-» si es negativo), así el resto del código no cambia.
+(function(){
+  const nat=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value');
+  const fmt=v=>{ if(typeof v==='number') v=String(Math.round(v)); const s=String(v??''), neg=/^\s*-/.test(s), d=s.replace(/\D/g,'');
+    return d?(neg?'-':'')+'$ '+Number(d).toLocaleString('es-CO'):(neg?'-':''); };
+  const crudo=el=>{ const s=nat.get.call(el), d=s.replace(/\D/g,''); return d?(/^\s*-/.test(s)?'-':'')+d:''; };
+  function campoPlata(el){
+    if(el.dataset.copListo) return; el.dataset.copListo='1';
+    const ini=nat.get.call(el); el.type='text'; el.inputMode='numeric'; el.autocomplete='off';
+    Object.defineProperty(el,'value',{configurable:true,get(){ return crudo(el); },set(v){ nat.set.call(el,fmt(v)); }});
+    el.addEventListener('input',()=>nat.set.call(el,fmt(nat.get.call(el))));
+    if(ini) nat.set.call(el,fmt(ini));
+  }
+  const todos=r=>r.querySelectorAll('input[data-cop]').forEach(campoPlata);
+  todos(document);
+  new MutationObserver(ms=>ms.forEach(m=>m.addedNodes.forEach(n=>{ if(n.nodeType!==1) return; if(n.matches('input[data-cop]')) campoPlata(n); todos(n); })))
+    .observe(document.documentElement,{childList:true,subtree:true});
+})();
 </script>
 </body>
 </html>
