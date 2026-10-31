@@ -1328,10 +1328,10 @@ function pintarRegistro(){
       </div>
       <div class="pmoney"><b>${cop(x.venta)}</b>vendido</div>
     </div>
-    ${regAbierta===x.id?regForm(x,i,dev):`<div class="bt"><button class="btn-fs" onclick="regAbrir('${esc(x.id)}')">Corregir</button>${dev?'':`<button class="btn-fs" onclick="regDevolucion(${i})">Marcar devolución</button>`}<button class="btn-fs" onclick="regEliminar(${i})">Eliminar</button></div>`}
+    ${regAbierta===x.id?regForm(x,i,dev):`<div class="bt"><button class="btn-fs" onclick="regAbrir(${i})">Corregir</button>${dev?'':`<button class="btn-fs" onclick="regDevolucion(${i})">Marcar devolución</button>`}<button class="btn-fs" onclick="regEliminar(${i})">Eliminar</button></div>`}
   </div>`;}).join('')+(l.length>150?`<div class="vacio">Hay ${l.length-150} más: búscala por nombre, celular o #.</div>`:'');
 }
-function regAbrir(id){ regAbierta=id; pintarRegistro(); }
+function regAbrir(i){ regAbierta=ventasReg[i]&&ventasReg[i].id; pintarRegistro(); }
 function regForm(x,i){
   return `<div class="pctrl">${REG_CAMPOS.map(([k,t])=>`<label class="chk" style="flex-direction:column;align-items:stretch;gap:4px;min-height:0">${t}
     ${k==='producto'||k==='notas'?`<textarea class="obs" id="rg-${k}" rows="2">${esc(x[k])}</textarea>`
