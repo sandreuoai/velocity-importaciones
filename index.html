@@ -692,8 +692,7 @@ function envFormulario(x,i){
   const t=x.transportadora||envTrans[0];
   return `<div class="env-form">
     <label>Transportadora<select class="sel" id="env-t">${envTrans.map(v=>`<option${v===t?' selected':''}>${esc(v)}</option>`).join('')}</select></label>
-    <label>Número de guía (opcional)<input class="obs" id="env-g" inputmode="text" autocomplete="off" value="${esc(x.guia||'')}" placeholder="Ej: 240012345678"></label>
-    <label class="btn-fs" style="display:flex;align-items:center;justify-content:center;flex-direction:row;color:var(--text)">Foto de la guía (opcional)<input type="file" id="env-f" accept="image/*" hidden onchange="this.parentNode.firstChild.textContent=this.files[0]?'Foto lista ✓ · toca para cambiarla':'Foto de la guía (opcional)'"></label>
+    <label class="btn-fs" style="display:flex;align-items:center;justify-content:center;flex-direction:row;color:var(--text)">📷 Foto de la guía<input type="file" id="env-f" accept="image/*" hidden onchange="this.parentNode.firstChild.textContent=this.files[0]?'Foto lista ✓ · toca para cambiarla':'📷 Foto de la guía'"></label>
     <div class="bt"><button class="btn-ok" id="env-ok" onclick="envDespachar(${i})">Guardar despacho</button><button class="btn-fs" onclick="envForm=null;pintarEnvios()">Cancelar</button></div>
   </div>`;
 }
@@ -702,7 +701,7 @@ function envFormulario(x,i){
 function envCambiar(i,sel){
   const x=envios[i]; if(!x) return;
   const v=sel.value;
-  if(v==='DESPACHADO'){ sel.value=x.estado; envForm=x.id; pintarEnvios(); setTimeout(()=>{ const g=$('env-g'); if(g) g.focus(); },50); return; }
+  if(v==='DESPACHADO'){ sel.value=x.estado; envForm=x.id; pintarEnvios(); return; }
   if(v==='ENTREGADO' && x.estado!=='DESPACHADO'){ sel.value=x.estado; toast('Primero márcalo despachado, con la guía','err'); return; }
   const atras=EST_ENV.findIndex(e=>e[0]===v)<EST_ENV.findIndex(e=>e[0]===x.estado);
   if((v==='ENTREGADO'||atras) && !confirm(`¿Pasar a «${EST_TXT[v]}»?\n\n${rotItems(x.producto).join(' · ')}\n${x.persona}`)){ sel.value=x.estado; return; }
@@ -711,8 +710,9 @@ function envCambiar(i,sel){
 
 async function envDespachar(i){
   const x=envios[i]; if(!x) return;
-  const guia=($('env-g').value||'').replace(/\s+/g,'').toUpperCase(), trans=$('env-t').value, f=$('env-f').files[0];
-  if(guia && !/^[0-9A-Z-]{4,30}$/.test(guia)){ toast('La guía va con solo números y letras','err'); $('env-g').focus(); return; }
+  // Sin escribir la guía (Andreu, 2026-10-30): el servidor la lee de la foto.
+  const guia='', trans=$('env-t').value, f=$('env-f').files[0];
+  if(!f && !confirm('¿Despachar sin foto de la guía?\n\nEl cliente no tendrá cómo rastrear su pedido.')) return;
   let foto=null;
   if(f){ try{ foto=await envComprimir(f); }catch(e){ toast('La foto no se pudo leer. Tómala otra vez.','err'); return; } }
   $('env-ok').disabled=true;
