@@ -271,10 +271,11 @@ button,a,label,select,input,textarea,.tab,.ficha{touch-action:manipulation}
       <button class="tab active" onclick="ir('envios',this)">Envíos</button>
       <button class="tab" onclick="ir('pedir',this)">Pedir a Pacho</button>
       <button class="tab" onclick="ir('rotulos',this)">Rótulos</button>
-      <button class="tab" id="tab-costos" onclick="ir('costos',this)">Costos</button>
-      <button class="tab" id="tab-pacho" onclick="ir('pacho',this)">Pacho</button>
-      <button class="tab" onclick="ir('deuda',this)">Deuda</button>
-      <button class="tab" onclick="ir('ventas',this)">Ventas</button>
+      <button class="tab" onclick="ir('registro',this)">Registro de ventas</button>
+      <button class="tab solo-jp" id="tab-costos" onclick="ir('costos',this)">Costos</button>
+      <button class="tab solo-jp" id="tab-pacho" onclick="ir('pacho',this)">Pacho</button>
+      <button class="tab solo-jp" onclick="ir('deuda',this)">Deuda</button>
+      <button class="tab solo-jp" onclick="ir('ventas',this)">Ventas</button>
     </div>
 
     <div class="page active" id="pg-envios">
@@ -330,6 +331,19 @@ button,a,label,select,input,textarea,.tab,.ficha{touch-action:manipulation}
           <button class="btn-primary" id="rot-btn" onclick="rotImprimir()">Imprimir</button>
         </div>
       </div>
+    </div>
+
+    <div class="page" id="pg-registro">
+      <div class="aviso">Las ventas que entraron (Manuel, asesores y la página). Corrige lo que quedó mal, marca una devolución o elimina una venta que no fue. Lo que cambies llega solo al panel de Andreu.</div>
+      <div class="hdr">
+        <span class="t" id="reg-n">Ventas</span>
+        <div class="acc">
+          <input type="search" class="search" id="reg-q" placeholder="Buscar cliente, celular, producto o #..." oninput="pintarRegistro()"/>
+          <select class="sel" id="reg-dias" onchange="cargarRegistro()" aria-label="Desde cuándo"><option value="15">Últimos 15 días</option><option value="45" selected>Últimos 45 días</option><option value="120">Últimos 120 días</option></select>
+          <button class="btn-fs" onclick="cargarRegistro()">Actualizar</button>
+        </div>
+      </div>
+      <div id="reg-lista"><div class="loading">Cargando...</div></div>
     </div>
 
     <div class="page" id="pg-costos">
@@ -455,11 +469,29 @@ function toast(msg, tipo){
 
 // Todo va por POST: usuario y clave nunca quedan en el enlace ni en los registros.
 async function get(params){ return post(params); }
+// Google tarda 1 a 2 s en contestar aunque no haga nada (medido el 2026-10-30) y a veces devuelve una página de error
+// en vez de datos: antes eso salía como falta de internet aunque hubiera internet. Ahora se reintenta solo y, si
+// igual falla, dice qué pasó. Lo que suma cada vez que se repite (impresiones, foto) no se reintenta.
+const SIN_REINTENTO={rot_impreso:1,envio_foto:1};
 async function post(body){
-  const r=await fetch(API,{method:'POST',body:JSON.stringify({...body,u:U,p:P}),
-    headers:{'Content-Type':'text/plain'},redirect:'follow'});
-  return r.json();
+  const intentos=SIN_REINTENTO[body.action]?1:3;
+  let ultimo;
+  for(let k=0;k<intentos;k++){
+    if(k) await new Promise(r=>setTimeout(r,800*k));
+    const ctl=new AbortController(), t=setTimeout(()=>ctl.abort(),35000);
+    try{
+      const r=await fetch(API,{method:'POST',body:JSON.stringify({...body,u:U,p:P}),
+        headers:{'Content-Type':'text/plain'},redirect:'follow',signal:ctl.signal});
+      const txt=await r.text();
+      let j; try{ j=JSON.parse(txt); }catch(e){ ultimo=new Error('Google respondió con un error'); continue; }
+      if(j&&j.error&&/ocupado/i.test(j.error)&&k<intentos-1){ ultimo=new Error(j.error); continue; }
+      return j;
+    }catch(e){ ultimo=new Error(!navigator.onLine?'Sin internet en este aparato':e.name==='AbortError'?'Google tardó demasiado':'Google no respondió'); }
+    finally{ clearTimeout(t); }
+  }
+  throw ultimo;
 }
+const errTxt=e=>(e&&e.message?e.message:'Google no respondió')+'. Vuelve a intentar';
 
 // ============================================================
 // LOGIN — se valida contra el servidor, no contra el HTML
@@ -472,10 +504,12 @@ async function entrar(){
     const r=await post({action:'login'});
     if(r.error){ $('lerr').textContent=r.error; U=P=''; return; }
     $('login').style.display='none'; $('app').style.display='block';
-    pachoHasta=r.pachoHasta||pachoHasta;
-    $('tab-pacho').hidden=r.pachoVisible===false;   // desde noviembre Pacho tiene sueldo: la pestaña se va al quedar en $0
-    cargarEnvios(); avisoCostos();
-  }catch(e){ $('lerr').textContent='No se pudo conectar. Revisa tu internet.'; U=P=''; }
+    pachoHasta=r.pachoHasta||pachoHasta; ROL=r.rol||'jp';
+    // El operador (Andreu, 2026-10-30) no ve costos, pagos a Pacho, deuda ni el resumen; el servidor igual se lo frena.
+    document.querySelectorAll('.solo-jp').forEach(b=>{ b.hidden=ROL!=='jp'; });
+    $('tab-pacho').hidden=ROL!=='jp'||r.pachoVisible===false;   // desde noviembre Pacho tiene sueldo: la pestaña se va al quedar en $0
+    cargarEnvios(); if(ROL==='jp') avisoCostos();
+  }catch(e){ $('lerr').textContent='No se pudo entrar: '+errTxt(e); U=P=''; }
 }
 function salir(){ U=P=''; $('app').style.display='none'; $('login').style.display='flex'; $('p').value=''; }
 
@@ -497,6 +531,7 @@ function ir(pg,btn){
   if(pg==='costos') cargarCostos();
   if(pg==='pacho') cargarPacho();
   if(pg==='deuda') cargarDeuda();
+  if(pg==='registro') cargarRegistro();
   if(pg==='ventas' && !$('d1').value){ rangoMes(0); }
 }
 
@@ -510,7 +545,7 @@ const PK='vs-jp-pendientes';
 function pendLeer(){ try{ return JSON.parse(localStorage.getItem(PK)||'{}'); }catch(e){ return {}; } }
 function pendGuardar(o){ try{ localStorage.setItem(PK,JSON.stringify(o)); }catch(e){} }
 function pendOcultar(k,modo,n){ const o=pendLeer(); o[k]={modo,n:n||0,dia:hoy()}; pendGuardar(o); pintarPendientes(); }
-let faltanCosto=0, ventaCero=0;
+let faltanCosto=0, ventaCero=0, ROL='jp';
 function pintarPendientes(){
   const o=pendLeer();
   const items=[
@@ -649,7 +684,7 @@ async function envOrigen(i,origen){
       if(r.estado!==antes) toast(r.estado==='POR PEDIR'?'Pasa a «Pedir a Pacho» ✓':r.estado==='POR DESPACHAR'?'Todo en bodega: queda «Por preparar» ✓':'Guardado ✓');
       else toast('Guardado ✓');
     }
-  }catch(e){ toast('No se pudo guardar. Revisa tu internet.','err'); }
+  }catch(e){ toast('No se pudo guardar: '+errTxt(e),'err'); }
   envBusy=false; pintarEnvios();
 }
 
@@ -704,7 +739,7 @@ async function envGuardar(i,estado,extra){
     if(s.aplica) partes.push(s.ok?s.mensaje:`Shopify no se enteró: ${s.mensaje}`);
     toast(partes.join(' · '), (s.aplica&&s.ok===false)||(w.aplica&&!w.enviado)?'err':'ok');
     if(w.enviado) envRevisarWa(x.id);
-  }catch(e){ toast('No se pudo guardar. Revisa tu internet.','err'); }
+  }catch(e){ toast('No se pudo guardar: '+errTxt(e),'err'); }
   envBusy=false; pintarEnvios();
 }
 
@@ -729,7 +764,7 @@ async function envSubirFoto(i,inp){
   try{
     const r=await post({action:'envio_foto',id:x.id,foto:await envComprimir(f)});
     if(r.error) toast(r.error,'err'); else { x.tieneFoto=true; toast('Foto guardada ✓'); }
-  }catch(e){ toast('No se pudo subir la foto. Revisa tu internet.','err'); }
+  }catch(e){ toast('No se pudo subir la foto: '+errTxt(e),'err'); }
   envBusy=false; pintarEnvios();
 }
 
@@ -865,7 +900,7 @@ async function rotCambiar(estado){
     if(r.error){ toast(r.error,'err'); return; }
     const w=r.whatsapp||{enviados:0,fallaron:[]};
     toast(`${r.cambiados} pedido(s) actualizados`+(w.enviados?` · ${w.enviados} WhatsApp enviados`:'')+(w.fallaron.length?` · ${w.fallaron.length} sin WhatsApp: míralos en Envíos`:''), w.fallaron.length?'err':'ok');
-  }catch(e){ toast('No se pudo guardar. Revisa tu internet.','err'); return; }
+  }catch(e){ toast('No se pudo guardar: '+errTxt(e),'err'); return; }
   finally{ rotBusy=false; }
   await cargarRotulos();
 }
@@ -925,7 +960,7 @@ async function rotConfirmar(ok){
   try{
     const r=await post({action:'rot_impreso',ids:l.map(x=>x.id)});
     if(r.error) toast(r.error,'err'); else toast('Impresión registrada');
-  }catch(e){ toast('No se pudo registrar la impresión. Revisa tu internet.','err'); }
+  }catch(e){ toast('No se pudo registrar la impresión: '+errTxt(e),'err'); }
   finally{ rotBusy=false; }
   await cargarRotulos();
 }
@@ -981,16 +1016,13 @@ function pintarCostos(){
 async function costoDevolucion(i){
   const x=costos[i]; if(!x||costosBusy) return;
   if(!confirm(`¿El pedido #${x.id} (${x.producto}) es una devolución?\n\nSale de las ventas, de la ganancia y de tu saldo, y ya no pide costo.`)) return;
-  costosBusy=true;
-  try{
-    const r=await post({action:'costo_devolucion',id:x.id});
-    if(r.error){ toast(r.error,'err'); return; }
-    costos.splice(i,1); avisoCostos();
-    toast('Marcado como devolución. Llega al panel de Andreu en la próxima sincronización.');
-  }catch(e){ toast('No se pudo guardar. Revisa tu internet.','err'); return; }
-  finally{ costosBusy=false; }
-  pintarCostos();
+  // Al instante: sale de la lista y se guarda por detrás; si Google no lo guarda, vuelve a la lista y lo dice.
+  costos.splice(i,1); costosContar(); pintarCostos();
+  toast('Marcado como devolución ✓');
+  post({action:'costo_devolucion',id:x.id}).then(r=>{ if(r.error) throw new Error(r.error); })
+    .catch(e=>{ costos.splice(Math.min(i,costos.length),0,x); costosContar(); pintarCostos(); toast(`#${x.id} NO quedó como devolución: `+errTxt(e),'err'); });
 }
+function costosContar(){ faltanCosto=costos.filter(c=>c.falta).length; pintarPendientes(); }
 
 async function costoGuardar(i){
   const x=costos[i]; if(!x||costosBusy) return;
@@ -999,15 +1031,12 @@ async function costoGuardar(i){
   if(x.inversion>0&&x.envio>0&&(x.inversion!==inv||x.envio!==env)
      &&!confirm(`Este pedido ya tenía costo.\n\nAntes: inversión ${cop(x.inversion)} · envío ${cop(x.envio)}\nAhora: inversión ${cop(inv)} · envío ${cop(env)}\n\n¿Cambiarlo?`)) return;
   if(x.inversion===inv&&x.envio===env){ toast('No cambió nada'); return; }
-  costosBusy=true;
-  try{
-    const r=await post({action:'costo_guardar',id:x.id,inversion:inv,envio:env});
-    if(r.error){ toast(r.error,'err'); return; }
-    x.inversion=r.inversion; x.envio=r.envio; x.falta=false; avisoCostos();
-    toast('Guardado. Llega al panel de Andreu en la próxima sincronización.');
-  }catch(e){ toast('No se pudo guardar. Revisa tu internet.','err'); return; }
-  finally{ costosBusy=false; }
-  pintarCostos();
+  // Al instante: se ve guardado y se manda por detrás (Google tarda 1 a 3 s); si no se guarda, vuelve como estaba y lo dice.
+  const antes={inversion:x.inversion,envio:x.envio,falta:x.falta};
+  x.inversion=inv; x.envio=env; x.falta=false; costosContar(); pintarCostos();
+  toast('Guardado ✓');
+  post({action:'costo_guardar',id:x.id,inversion:inv,envio:env}).then(r=>{ if(r.error) throw new Error(r.error); })
+    .catch(e=>{ Object.assign(x,antes); costosContar(); pintarCostos(); toast(`#${x.id} NO se guardó: `+errTxt(e),'err'); });
 }
 
 // ============================================================
@@ -1132,7 +1161,7 @@ async function pedExportar(soloMarcar){
       toast('PDF listo ✓');
       window.scrollTo({top:0,behavior:'smooth'});
     }
-  }catch(e){ toast('No se pudo. Revisa tu internet y vuelve a intentar.','err'); }
+  }catch(e){ toast('No se pudo: '+errTxt(e),'err'); }
   pedBusy=false; await cargarPedir();
 }
 // En una segunda revisión apareció en la bodega: sale de la lista y en Envíos queda como de bodega. Va pedido por
@@ -1220,7 +1249,7 @@ async function pachoMarcar(lista,pagado,pregunta){
       pedidos:lista.map(x=>({hoja:x.hoja,fila:x.fila,producto:x.producto}))});
     if(r.error) toast('No se marcó nada: '+r.error,'err');
     else toast(`Listo: ${r.marcados} pedido${r.marcados===1?'':'s'} por ${cop(r.total)}.`);
-  }catch(e){ toast('No se pudo guardar. Revisa tu internet.','err'); }
+  }catch(e){ toast('No se pudo guardar: '+errTxt(e),'err'); }
   finally{ pachoBusy=false; cargarPacho(); }
 }
 function pachoPagarHasta(){
@@ -1267,6 +1296,75 @@ async function cargarDeuda(){
         <span class="rkv" style="color:var(--green)">${cop(a.valor)}</span></li>`).join('')
       : '<li style="padding:16px 0;color:var(--muted);font-size:12px;text-align:center">Sin abonos todavía</li>';
   }catch(e){ $('c-deuda').innerHTML='<div class="loading">Error de conexión</div>'; }
+}
+
+// ============================================================
+// REGISTRO DE VENTAS (2026-10-30): corregir, devolución o eliminar. Sin inversión, envío ni ganancia: esos no
+// llegan del servidor. Guardar y devolución se ven al instante y se mandan por detrás; eliminar espera la respuesta.
+const REG_CAMPOS=[['producto','Producto'],['nombre','Cliente'],['cel','Celular'],['ciudad','Ciudad'],['direccion','Dirección'],['cedula','Cédula'],['medioPago','Medio de pago'],['venta','Valor de la venta'],['notas','Notas']];
+let ventasReg=[], regAbierta=null;
+async function cargarRegistro(){
+  $('reg-lista').innerHTML='<div class="loading">Cargando...</div>';
+  try{
+    const r=await get({action:'ventas_lista',dias:$('reg-dias').value});
+    if(r.error){ $('reg-lista').innerHTML=`<div class="vacio">${esc(r.error)}</div>`; return; }
+    ventasReg=r.ventas||[]; pintarRegistro();
+  }catch(e){ $('reg-lista').innerHTML=`<div class="vacio">No cargó: ${esc(errTxt(e))}</div>`; }
+}
+function regBuscar(x,q){ return !q||[x.nombre,x.cel,x.producto,x.ciudad,'#'+x.id,x.id].some(v=>String(v||'').toLowerCase().includes(q)); }
+function pintarRegistro(){
+  const q=($('reg-q').value||'').toLowerCase().trim();
+  const l=ventasReg.map((x,i)=>({x,i})).filter(o=>regBuscar(o.x,q));
+  $('reg-n').textContent=`Ventas (${l.length})`;
+  if(!l.length){ $('reg-lista').innerHTML='<div class="vacio"><div>No hay ventas con ese filtro.</div></div>'; return; }
+  $('reg-lista').innerHTML=l.slice(0,150).map(({x,i})=>{
+    const dev=x.canal==='DEVOLUCION'||x.canal==='CAMBIO';
+    return `<div class="pedido ${dev?'listo':''}">
+    <div class="ptop">
+      <div style="flex:1;min-width:0">
+        <div class="pprod">${esc(x.producto)}${dev?'<span class="chip chip-pend">devolución</span>':''}${x.importacion?'<span class="chip chip-pacho">importación</span>':''}</div>
+        <div class="pmeta">${esc(x.nombre||'—')} · ${esc(x.cel||'sin celular')} · ${esc(x.ciudad||'sin ciudad')} · ${fFecha(x.fecha)} · #${esc(x.id)}</div>
+        <div class="pmeta">${esc(x.medioPago||'sin medio de pago')}${x.notas?' · '+esc(x.notas):''}</div>
+      </div>
+      <div class="pmoney"><b>${cop(x.venta)}</b>vendido</div>
+    </div>
+    ${regAbierta===x.id?regForm(x,i,dev):`<div class="bt"><button class="btn-fs" onclick="regAbrir('${esc(x.id)}')">Corregir</button>${dev?'':`<button class="btn-fs" onclick="regDevolucion(${i})">Marcar devolución</button>`}<button class="btn-fs" onclick="regEliminar(${i})">Eliminar</button></div>`}
+  </div>`;}).join('')+(l.length>150?`<div class="vacio">Hay ${l.length-150} más: búscala por nombre, celular o #.</div>`:'');
+}
+function regAbrir(id){ regAbierta=id; pintarRegistro(); }
+function regForm(x,i){
+  return `<div class="pctrl">${REG_CAMPOS.map(([k,t])=>`<label class="chk" style="flex-direction:column;align-items:stretch;gap:4px;min-height:0">${t}
+    ${k==='producto'||k==='notas'?`<textarea class="obs" id="rg-${k}" rows="2">${esc(x[k])}</textarea>`
+      :`<input class="obs" id="rg-${k}" ${k==='venta'||k==='cel'||k==='cedula'?'inputmode="numeric"':''} value="${esc(k==='venta'?(x.venta||''):x[k])}">`}</label>`).join('')}
+    <div class="bt"><button class="btn-ok" onclick="regGuardar(${i})">Guardar</button><button class="btn-fs" onclick="regAbierta=null;pintarRegistro()">Cancelar</button></div></div>`;
+}
+function regGuardar(i){
+  const x=ventasReg[i]; if(!x) return;
+  const campos={}, antes={};
+  REG_CAMPOS.forEach(([k])=>{ let v=$('rg-'+k).value.trim(); if(k==='venta') v=soloNum(v); if(String(v)!==String(x[k]??'')){ campos[k]=v; antes[k]=x[k]; } });
+  if(!Object.keys(campos).length){ toast('No cambió nada'); regAbierta=null; pintarRegistro(); return; }
+  if('venta' in campos&&!(campos.venta>0)){ toast('El valor tiene que ser mayor que cero','err'); return; }
+  if(campos.cel!==undefined&&campos.venta!==undefined&&campos.nombre!==undefined){ toast('Cambiar celular, valor y nombre a la vez ya es otra venta: elimínala y que la registren de nuevo','err'); return; }
+  Object.assign(x,campos); regAbierta=null; pintarRegistro(); toast('Guardado ✓');
+  post({action:'venta_editar',id:x.id,campos}).then(r=>{ if(r.error) throw new Error(r.error); })
+    .catch(e=>{ Object.assign(x,antes); pintarRegistro(); toast(`#${x.id} NO se guardó: `+errTxt(e),'err'); });
+}
+function regDevolucion(i){
+  const x=ventasReg[i]; if(!x) return;
+  if(!confirm(`¿La venta #${x.id} de ${x.nombre||'este cliente'} (${x.producto}) es una devolución?\n\nSale de las ventas.`)) return;
+  const antes=x.canal; x.canal='DEVOLUCION'; pintarRegistro(); toast('Marcada como devolución ✓');
+  post({action:'venta_devolucion',id:x.id}).then(r=>{ if(r.error) throw new Error(r.error); })
+    .catch(e=>{ x.canal=antes; pintarRegistro(); toast(`#${x.id} NO quedó como devolución: `+errTxt(e),'err'); });
+}
+async function regEliminar(i){
+  const x=ventasReg[i]; if(!x) return;
+  if(!confirm(`¿ELIMINAR la venta #${x.id} de ${x.nombre||'este cliente'} por ${cop(x.venta)}?\n\nEs para una venta que no fue (registrada por error o repetida). Si el cliente la devolvió, usa «Marcar devolución».`)) return;
+  toast('Eliminando...');
+  try{
+    const r=await post({action:'venta_eliminar',id:x.id});
+    if(r.error){ toast(r.error,'err'); return; }
+    ventasReg=ventasReg.filter(v=>v!==x); pintarRegistro(); toast(`Venta #${x.id} eliminada ✓`);
+  }catch(e){ toast('No se pudo eliminar: '+errTxt(e),'err'); }
 }
 
 // ============================================================
