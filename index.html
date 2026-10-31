@@ -679,7 +679,7 @@ async function envOrigen(i,origen){
     if(r.error){ toast(r.error,'err'); }
     else{
       (x.prendas||[]).forEach(p=>{ if(r.origen[p.idx]) p.origen=r.origen[p.idx]; });
-      const antes=x.estado; x.estado=r.estado; x.importacion=r.importacion;
+      const antes=x.estado; x.estado=r.estado; x.importacion=r.importacion; if(r.limite) x.limite=r.limite;
       if(r.estado!=='POR REVISAR') envOrigenAbierto=null;
       if(r.estado!==antes) toast(r.estado==='POR PEDIR'?'Pasa a «Pedir a Pacho» ✓':r.estado==='POR DESPACHAR'?'Todo en bodega: queda «Por preparar» ✓':'Guardado ✓');
       else toast('Guardado ✓');
