@@ -573,7 +573,7 @@ async function avisoCostos(){
 // y Shopify le manda el correo al cliente) y «entregado». «En China» y «Viene para Colombia» son internos.
 // Al cambiar el estado (salvo En China y Viene para Colombia) el servidor le manda al cliente la plantilla de WhatsApp
 // del estado. Si no sale o el número no tiene WhatsApp, la tarjeta dice a quién llamar o escribir.
-const EST_ENV=[['POR REVISAR','Revisar bodega'],['POR PEDIR','Por pedir a Pacho'],['EN CHINA','Pedido a China'],['EN CAMINO','Viene para Colombia'],['POR DESPACHAR','Por preparar'],['PREPARANDO','Preparando'],['DESPACHADO','Despachado'],['ENTREGADO','Entregado']];
+const EST_ENV=[['POR REVISAR','Revisar bodega'],['POR PEDIR','Por pedir a Pacho'],['EN CHINA','Pedido a China'],['EN CAMINO','Viene para Colombia'],['POR DESPACHAR','Listo para despachar'],['PAUSADO','Pausado'],['DESPACHADO','Despachado'],['ENTREGADO','Entregado']];
 const EST_TXT=Object.fromEntries(EST_ENV);
 const SHOP_TXT={UNFULFILLED:'sin preparar',OPEN:'sin preparar',IN_PROGRESS:'en preparación',FULFILLED:'enviado',PARTIALLY_FULFILLED:'enviado en parte',ON_HOLD:'en espera',SCHEDULED:'programado',PENDING_FULFILLMENT:'pendiente'};
 let envios=[], envF='ABIERTOS', envForm=null, envBusy=false, envTrans=['Interrapidísimo'];
@@ -590,17 +590,17 @@ async function cargarEnvios(){
 }
 
 // Abiertos (por defecto): todo lo que Juan Pablo aún mueve. Despachado y Entregado solo con su ficha (Andreu, 2026-10-28).
-const envGrupo={ABIERTOS:['POR REVISAR','POR PEDIR','EN CHINA','EN CAMINO','POR DESPACHAR','PREPARANDO'],HACER:['POR REVISAR','POR DESPACHAR','PREPARANDO'],'POR PEDIR':['POR PEDIR'],'EN CHINA':['EN CHINA'],'EN CAMINO':['EN CAMINO'],DESPACHADO:['DESPACHADO'],ENTREGADO:['ENTREGADO']};
+const envGrupo={ABIERTOS:['POR REVISAR','POR PEDIR','EN CHINA','EN CAMINO','POR DESPACHAR','PAUSADO'],HACER:['POR REVISAR','POR DESPACHAR'],PAUSADO:['PAUSADO'],'POR PEDIR':['POR PEDIR'],'EN CHINA':['EN CHINA'],'EN CAMINO':['EN CAMINO'],DESPACHADO:['DESPACHADO'],ENTREGADO:['ENTREGADO']};
 function envFiltro(v){ envF=v; envForm=null; pintarEnvios(); }
 
 function pintarEnvios(){
   const n=k=>envios.filter(x=>envGrupo[k].includes(x.estado)).length;
   const chip=(v,t)=>`<button class="ficha ${envF===v?'on':''}" role="tab" aria-selected="${envF===v}" onclick="envFiltro('${v}')">${t} <b>${n(v)}</b></button>`;
-  $('env-fichas').innerHTML=chip('ABIERTOS','Abiertos')+chip('HACER','Por hacer')+chip('POR PEDIR','Por pedir a Pacho')+chip('EN CHINA','Pedido a China')+chip('EN CAMINO','Viene para Colombia')+chip('DESPACHADO','Despachados')+chip('ENTREGADO','Entregados');
+  $('env-fichas').innerHTML=chip('ABIERTOS','Abiertos')+chip('HACER','Por hacer')+chip('POR PEDIR','Por pedir a Pacho')+chip('EN CHINA','Pedido a China')+chip('EN CAMINO','Viene para Colombia')+chip('PAUSADO','Pausados')+chip('DESPACHADO','Despachados')+chip('ENTREGADO','Entregados');
   const q=($('env-q').value||'').toLowerCase().trim();
   let l=q?envios:envios.filter(x=>envGrupo[envF].includes(x.estado));   // la búsqueda mira todos los estados
   if(q) l=l.filter(x=>[x.persona,x.producto,x.numero,x.guia,x.id,x.shopify&&x.shopify.pedido].some(v=>String(v||'').toLowerCase().includes(q)));
-  $('env-n').textContent=(q?'Resultados':{ABIERTOS:'Abiertos',HACER:'Por hacer','POR PEDIR':'Por pedir a Pacho','EN CHINA':'Pedido a China','EN CAMINO':'Viene para Colombia',DESPACHADO:'Despachados',ENTREGADO:'Entregados'}[envF])+` (${l.length})`;
+  $('env-n').textContent=(q?'Resultados':{ABIERTOS:'Abiertos',HACER:'Por hacer','POR PEDIR':'Por pedir a Pacho','EN CHINA':'Pedido a China','EN CAMINO':'Viene para Colombia',PAUSADO:'Pausados',DESPACHADO:'Despachados',ENTREGADO:'Entregados'}[envF])+` (${l.length})`;
   if(!l.length){ $('env-lista').innerHTML=`<div class="vacio"><div class="big">✅</div><div>${q?'Ningún pedido coincide.':'No hay pedidos aquí.'}</div></div>`; return; }
   $('env-lista').innerHTML=l.map(envTarjeta).join('');
 }
@@ -615,7 +615,7 @@ function plazoChip(limite,estado){
   return `<span class="chip ${cls}">Llega al cliente a más tardar el ${fFecha(limite)} · ${cuanto}</span>`;
 }
 
-function envClase(e){ return ['POR PEDIR','EN CHINA','EN CAMINO'].includes(e)?'env-espera':e==='POR DESPACHAR'||e==='POR REVISAR'?'env-hacer':e==='PREPARANDO'?'env-prep':'env-ok'; }
+function envClase(e){ return ['POR PEDIR','EN CHINA','EN CAMINO','PAUSADO'].includes(e)?'env-espera':e==='POR DESPACHAR'||e==='POR REVISAR'?'env-hacer':'env-ok'; }
 
 function envTarjeta(x){
   const i=envios.indexOf(x), s=x.shopify;
@@ -652,7 +652,7 @@ function envTarjeta(x){
 
 // Bodega o importación, prenda por prenda (Andreu, 2026-10-22): la regla de la página no siempre acierta.
 // Con todas marcadas el pedido se mueve solo: todo en bodega → Por preparar; alguna de importación → Pedir a Pacho.
-const EST_AUTO=['POR REVISAR','POR PEDIR','ENTREGADO'];   // Entregado lo pone el servidor a los 4 días de despachado
+const EST_AUTO=['POR REVISAR','POR PEDIR','POR DESPACHAR','ENTREGADO'];   // Entregado lo pone el servidor a los 4 días de despachado
 let envOrigenAbierto=null;
 function envOrigenBloque(x,i){
   const pr=x.prendas||[];
@@ -703,7 +703,16 @@ function envCambiar(i,sel){
   const v=sel.value;
   if(v==='DESPACHADO'){ sel.value=x.estado; envForm=x.id; pintarEnvios(); return; }
   if(v==='ENTREGADO' && x.estado!=='DESPACHADO'){ sel.value=x.estado; toast('Primero márcalo despachado, con la guía','err'); return; }
-  const atras=EST_ENV.findIndex(e=>e[0]===v)<EST_ENV.findIndex(e=>e[0]===x.estado);
+  const atras=v!=='PAUSADO'&&x.estado!=='PAUSADO'&&EST_ENV.findIndex(e=>e[0]===v)<EST_ENV.findIndex(e=>e[0]===x.estado);
+  if(v==='PAUSADO'){
+    // Pausar: Shopify lo deja «en espera» con este motivo (para que el equipo sepa qué pasó).
+    // El cliente recibe un WhatsApp con lo que escribas aquí, tal cual: sé claro y amable.
+    const motivo=(prompt(`¿Qué pasó con este pedido? (se lo decimos al cliente)\n\n${rotItems(x.producto).join(' · ')}\n${x.persona}\n\nEj.: el proveedor nos avisó que esa talla se demora unos días más`)||'').trim();
+    if(!motivo){ sel.value=x.estado; toast('Escribe qué pasó para pausarlo','err'); return; }
+    const siguiente=(prompt('¿Qué sigue? (también se lo decimos al cliente)\n\nEj.: te escribimos apenas llegue y te confirmamos la nueva fecha de entrega')||'').trim();
+    if(!siguiente){ sel.value=x.estado; toast('Escribe qué sigue para pausarlo','err'); return; }
+    envGuardar(i,v,{motivo,siguiente}); return;
+  }
   if((v==='ENTREGADO'||atras) && !confirm(`¿Pasar a «${EST_TXT[v]}»?\n\n${rotItems(x.producto).join(' · ')}\n${x.persona}`)){ sel.value=x.estado; return; }
   envGuardar(i,v);
 }
@@ -732,7 +741,7 @@ async function envGuardar(i,estado,extra){
     if(r.pendiente){
       toast(`${EST_TXT[estado]} ✓ guardado. Avisando a Shopify y al cliente...`);
       envBusy=false; pintarEnvios();
-      envAvisar(x,estado,r.antes);
+      envAvisar(x,estado,r.antes,extra);
       return;
     }
     envAplicar(x,estado,r);
@@ -741,9 +750,9 @@ async function envGuardar(i,estado,extra){
 }
 
 // Segunda llamada: lee la guía de la foto, avisa a Shopify y manda el WhatsApp. Lo guardado ya está a salvo.
-async function envAvisar(x,estado,antes){
+async function envAvisar(x,estado,antes,extra){
   try{
-    const r=await post({action:'envio_avisar',id:x.id,estado,antes});
+    const r=await post({action:'envio_avisar',id:x.id,estado,antes,motivo:(extra||{}).motivo||'',siguiente:(extra||{}).siguiente||''});
     if(r.error){ toast('Quedó guardado, pero no se avisó: '+r.error,'err'); pintarEnvios(); return; }
     if(r.guia) x.guia=r.guia;
     envAplicar(x,estado,r);
@@ -755,7 +764,7 @@ function envAplicar(x,estado,r){
   const s=r.shopify||{};
   if(s.pedido && !x.shopify) x.shopify={pedido:s.pedido};
   x.shopifyAviso=s.aplica&&s.ok===false?s.mensaje:'';
-  if(s.aplica&&s.ok&&x.shopify){ x.shopify.estado={PREPARANDO:'IN_PROGRESS',DESPACHADO:'FULFILLED',ENTREGADO:'FULFILLED'}[estado]||x.shopify.estado; }
+  if(s.aplica&&s.ok&&x.shopify){ x.shopify.estado={'EN CHINA':'FULFILLED','EN CAMINO':'FULFILLED',PAUSADO:'ON_HOLD',DESPACHADO:'FULFILLED',ENTREGADO:'FULFILLED'}[estado]||x.shopify.estado; }
   if(r.shopifyPedido) x.shopifyPedido=r.shopifyPedido;
   const w=r.whatsapp||{};
   if(w.aplica) x.wa={estado:w.enviado?estado:'',id:w.id||'',aviso:w.enviado?'':w.mensaje,el:'ahora',sinCelular:!!w.sinCelular,sinWhatsApp:!!w.sinWhatsApp};
