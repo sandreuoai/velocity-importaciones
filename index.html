@@ -1147,6 +1147,7 @@ function pintarPedir(){
         ${x.nota?`<div class="aviso" style="margin:0">Nota del pedido: ${esc(x.nota)}</div>`:''}
         <input class="obs" placeholder="Dorsal: nombre y número (ej: JAMES #10)" aria-label="Dorsal" value="${esc(x.dorsal||'')}" oninput="pedCampo('${k}','dorsal',this.value)">
         ${x.inscripcion?`<div class="pmeta">Inscripción: ${esc(x.inscripcion)}</div>`:''}
+        ${(x.parches&&x.parches.length)?`<div class="pmeta">Parches: ${esc(x.parches.join(' · '))}</div>`:''}
         <input class="obs" placeholder="Observación (ej: pagó la mitad)" aria-label="Observación" value="${esc(x.obs||'')}" oninput="pedCampo('${k}','obs',this.value)">
         <label class="chk"><input type="checkbox" ${pedSel.has(x.llave)?'checked':''} onchange="pedElegir('${k}',this.checked)"> Pedir esta prenda</label>
       </div>
