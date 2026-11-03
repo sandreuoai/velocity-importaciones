@@ -723,24 +723,48 @@ async function envGuardar(i,estado,extra){
   const x=envios[i]; if(!x||envBusy) return;
   envBusy=true; toast('Guardando...');
   try{
-    const r=await post({action:'envio_estado',id:x.id,estado,...(extra||{})});
+    // Dos llamadas (2026-11-03: guardar tardaba): primero se guarda y se responde; Shopify, la guía de la foto y el
+    // WhatsApp van después, en segundo plano. Un servidor viejo que no conozca «fase» contesta todo junto, como antes.
+    const r=await post({action:'envio_estado',id:x.id,estado,fase:'guardar',...(extra||{})});
     if(r.error){ toast(r.error,'err'); envBusy=false; pintarEnvios(); return; }
     Object.assign(x,{estado:r.estado,guia:r.guia||'',transportadora:r.transportadora||'',tieneFoto:r.tieneFoto});
-    const s=r.shopify||{};
-    if(s.pedido && !x.shopify) x.shopify={pedido:s.pedido};
-    x.shopifyAviso=s.aplica&&s.ok===false?s.mensaje:'';
-    if(s.aplica&&s.ok&&x.shopify){ x.shopify.estado={PREPARANDO:'IN_PROGRESS',DESPACHADO:'FULFILLED',ENTREGADO:'FULFILLED'}[estado]||x.shopify.estado; }
-    if(r.shopifyPedido) x.shopifyPedido=r.shopifyPedido;
-    const w=r.whatsapp||{};
-    if(w.aplica) x.wa={estado:w.enviado?estado:'',id:w.id||'',aviso:w.enviado?'':w.mensaje,el:'ahora',sinCelular:!!w.sinCelular,sinWhatsApp:!!w.sinWhatsApp};
     envForm=null;
-    const partes=[`${EST_TXT[estado]} ✓`];
-    if(w.aplica) partes.push(w.enviado?'WhatsApp enviado al cliente':'El WhatsApp no salió: míralo en la tarjeta');
-    if(s.aplica) partes.push(s.ok?s.mensaje:`Shopify no se enteró: ${s.mensaje}`);
-    toast(partes.join(' · '), (s.aplica&&s.ok===false)||(w.aplica&&!w.enviado)?'err':'ok');
-    if(w.enviado) envRevisarWa(x.id);
+    if(r.pendiente){
+      toast(`${EST_TXT[estado]} ✓ guardado. Avisando a Shopify y al cliente...`);
+      envBusy=false; pintarEnvios();
+      envAvisar(x,estado,r.antes);
+      return;
+    }
+    envAplicar(x,estado,r);
   }catch(e){ toast('No se pudo guardar: '+errTxt(e),'err'); }
   envBusy=false; pintarEnvios();
+}
+
+// Segunda llamada: lee la guía de la foto, avisa a Shopify y manda el WhatsApp. Lo guardado ya está a salvo.
+async function envAvisar(x,estado,antes){
+  try{
+    const r=await post({action:'envio_avisar',id:x.id,estado,antes});
+    if(r.error){ toast('Quedó guardado, pero no se avisó: '+r.error,'err'); pintarEnvios(); return; }
+    if(r.guia) x.guia=r.guia;
+    envAplicar(x,estado,r);
+  }catch(e){ toast('Quedó guardado, pero no se pudo avisar a Shopify ni al cliente: '+errTxt(e),'err'); }
+  pintarEnvios();
+}
+
+function envAplicar(x,estado,r){
+  const s=r.shopify||{};
+  if(s.pedido && !x.shopify) x.shopify={pedido:s.pedido};
+  x.shopifyAviso=s.aplica&&s.ok===false?s.mensaje:'';
+  if(s.aplica&&s.ok&&x.shopify){ x.shopify.estado={PREPARANDO:'IN_PROGRESS',DESPACHADO:'FULFILLED',ENTREGADO:'FULFILLED'}[estado]||x.shopify.estado; }
+  if(r.shopifyPedido) x.shopifyPedido=r.shopifyPedido;
+  const w=r.whatsapp||{};
+  if(w.aplica) x.wa={estado:w.enviado?estado:'',id:w.id||'',aviso:w.enviado?'':w.mensaje,el:'ahora',sinCelular:!!w.sinCelular,sinWhatsApp:!!w.sinWhatsApp};
+  envForm=null;
+  const partes=[`${EST_TXT[estado]} ✓`];
+  if(w.aplica) partes.push(w.enviado?'WhatsApp enviado al cliente':'El WhatsApp no salió: míralo en la tarjeta');
+  if(s.aplica) partes.push(s.ok?s.mensaje:`Shopify no se enteró: ${s.mensaje}`);
+  toast(partes.join(' · '), (s.aplica&&s.ok===false)||(w.aplica&&!w.enviado)?'err':'ok');
+  if(w.enviado) envRevisarWa(x.id);
 }
 
 // La foto se achica en el celular antes de subir (lado largo de 1.600 px): sube rápido y se lee igual.
