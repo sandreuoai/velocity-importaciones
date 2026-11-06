@@ -1156,7 +1156,7 @@ function pintarPedir(){
         ${x.nota?`<div class="aviso" style="margin:0">Nota del pedido: ${esc(x.nota)}</div>`:''}
         <input class="obs" placeholder="Dorsal: nombre y número (ej: JAMES #10)" aria-label="Dorsal" value="${esc(x.dorsal||'')}" oninput="pedCampo('${k}','dorsal',this.value)">
         ${x.inscripcion?`<div class="pmeta">Inscripción: ${esc(x.inscripcion)}</div>`:''}
-        ${(x.parches&&x.parches.length)?`<div class="pmeta">Parches: ${esc(x.parches.join(' · '))}</div>`:''}
+        ${(x.parches&&x.parches.length)?`<div class="pmeta">Parches: ${x.parches.map(parcheConFoto).join(' · ')}</div>`:''}
         <input class="obs" placeholder="Observación (ej: pagó la mitad)" aria-label="Observación" value="${esc(x.obs||'')}" oninput="pedCampo('${k}','obs',this.value)">
         <label class="chk"><input type="checkbox" ${pedSel.has(x.llave)?'checked':''} onchange="pedElegir('${k}',this.checked)"> Pedir esta prenda</label>
       </div>
@@ -1166,6 +1166,10 @@ function pintarPedir(){
 function pedCampo(k,campo,v){ const x=pedL.find(y=>y.llave===k); if(x) x[campo]=v; }
 function pedElegir(k,on){ if(on) pedSel.add(k); else pedSel.delete(k); pintarPedir(); }
 function pedTodos(){ const l=pedVisibles(), todas=l.every(x=>pedSel.has(x.llave)); l.forEach(x=>todas?pedSel.delete(x.llave):pedSel.add(x.llave)); pintarPedir(); }
+function parcheConFoto(n){ // assets del tema; misma carpeta que PARCHE_BASE de servidor.gs. Sin foto («Otro parche»), solo el nombre.
+  const slug=String(n).normalize('NFKD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\+/g,'-actual').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');
+  return `<img src="https://velocitysavage.com/cdn/shop/t/134/assets/vs-parche-${slug}.png" alt="" width="36" height="36" loading="lazy" onerror="this.remove()" style="vertical-align:middle;object-fit:contain;background:#F5F5F2;border-radius:50%;padding:3px;margin-right:4px">${esc(n)}`;
+}
 function pintarPedBarra(){
   const b=$('ped-barra'), n=pedL.filter(x=>pedSel.has(x.llave)).length, nt=pedL.filter(x=>pedSel.has(x.llave)&&x.fecha<=pachoHasta).length;
   b.hidden=!pedL.length; if(b.hidden) return;
