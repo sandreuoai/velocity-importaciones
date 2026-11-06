@@ -627,6 +627,7 @@ function envTarjeta(x){
     +(x.shopifyAviso?'<span class="chip chip-err">Shopify no se enteró</span>':'')
     +plazoChip(x.limite,x.estado);
   const guia=x.guia?`<div class="env-guia">Guía <b>${esc(x.guia)}</b> · ${esc(x.transportadora)}${x.despachadoEl?' · salió '+esc(x.despachadoEl):''}${x.entregadoEl?' · llegó '+esc(x.entregadoEl):''}</div>`:'';
+  const privada=x.transportadora==='Privada'&&!x.guia&&x.despachadoEl?`<div class="env-guia">Transportadora privada · salió ${esc(x.despachadoEl)}${x.entregadoEl?' · llegó '+esc(x.entregadoEl):''}</div>`:'';
   const foto=x.tieneFoto?`<button class="btn-link" onclick="envVerFoto(${i})">Ver foto de la guía</button><div class="env-foto" id="env-foto-${i}"></div>`
     :(x.guia?`<label class="btn-link" style="display:inline-flex;align-items:center">Subir foto de la guía<input type="file" accept="image/*" hidden onchange="envSubirFoto(${i},this)"></label>`:'');
   const aviso=x.shopifyAviso?`<div class="aviso" style="margin:0">Shopify: ${esc(x.shopifyAviso)}<div style="margin-top:8px"><button class="btn-fs" onclick="envGuardar(${i},'${x.estado}')">Reintentar en Shopify</button></div></div>`:'';
@@ -638,7 +639,7 @@ function envTarjeta(x){
       <div class="pprod">${esc(rotItems(x.producto).join(' · ')||'(sin producto)')}</div>
       <div>${chips}</div>
       <div class="pmeta">${esc(x.persona||'—')} · ${esc(x.ciudad||'sin ciudad')} · vendido ${fFecha(x.fecha)} · #${esc(x.id)}${x.numero?' · '+esc(x.numero):''}</div>
-      ${guia}${foto}
+      ${guia}${privada}${foto}
     </div></div>
     <div class="pctrl">
       ${aviso}${wa}${origen}
@@ -691,8 +692,8 @@ async function envOrigen(i,origen){
 function envFormulario(x,i){
   const t=x.transportadora||envTrans[0];
   return `<div class="env-form">
-    <label>Transportadora<select class="sel" id="env-t">${envTrans.map(v=>`<option${v===t?' selected':''}>${esc(v)}</option>`).join('')}</select></label>
-    <label class="btn-fs" style="display:flex;align-items:center;justify-content:center;flex-direction:row;color:var(--text)">📷 Foto de la guía<input type="file" id="env-f" accept="image/*" hidden onchange="this.parentNode.firstChild.textContent=this.files[0]?'Foto lista ✓ · toca para cambiarla':'📷 Foto de la guía'"></label>
+    <label>Transportadora<select class="sel" id="env-t" onchange="$('env-fb').hidden=this.value==='Privada'">${envTrans.map(v=>`<option${v===t?' selected':''}>${esc(v)}</option>`).join('')}</select></label>
+    <label class="btn-fs" id="env-fb"${t==='Privada'?' hidden':''} style="display:flex;align-items:center;justify-content:center;flex-direction:row;color:var(--text)">📷 Foto de la guía<input type="file" id="env-f" accept="image/*" hidden onchange="this.parentNode.firstChild.textContent=this.files[0]?'Foto lista ✓ · toca para cambiarla':'📷 Foto de la guía'"></label>
     <div class="bt"><button class="btn-ok" id="env-ok" onclick="envDespachar(${i})">Guardar despacho</button><button class="btn-fs" onclick="envForm=null;pintarEnvios()">Cancelar</button></div>
   </div>`;
 }
@@ -720,8 +721,9 @@ function envCambiar(i,sel){
 async function envDespachar(i){
   const x=envios[i]; if(!x) return;
   // Sin escribir la guía (Andreu, 2026-10-30): el servidor la lee de la foto.
-  const guia='', trans=$('env-t').value, f=$('env-f').files[0];
-  if(!f && !confirm('¿Despachar sin foto de la guía?\n\nEl cliente no tendrá cómo rastrear su pedido.')) return;
+  // Privada (Andreu, 2026-11-06): nunca lleva guía ni foto.
+  const guia='', trans=$('env-t').value, f=trans==='Privada'?null:$('env-f').files[0];
+  if(trans!=='Privada' && !f && !confirm('¿Despachar sin foto de la guía?\n\nEl cliente no tendrá cómo rastrear su pedido.')) return;
   let foto=null;
   if(f){ try{ foto=await envComprimir(f); }catch(e){ toast('La foto no se pudo leer. Tómala otra vez.','err'); return; } }
   $('env-ok').disabled=true;
