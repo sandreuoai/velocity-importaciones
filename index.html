@@ -692,8 +692,8 @@ async function envOrigen(i,origen){
 function envFormulario(x,i){
   const t=x.transportadora||envTrans[0];
   return `<div class="env-form">
-    <label>Transportadora<select class="sel" id="env-t" onchange="$('env-fb').hidden=this.value==='Privada'">${envTrans.map(v=>`<option${v===t?' selected':''}>${esc(v)}</option>`).join('')}</select></label>
-    <label class="btn-fs" id="env-fb"${t==='Privada'?' hidden':''} style="display:flex;align-items:center;justify-content:center;flex-direction:row;color:var(--text)">📷 Foto de la guía<input type="file" id="env-f" accept="image/*" hidden onchange="this.parentNode.firstChild.textContent=this.files[0]?'Foto lista ✓ · toca para cambiarla':'📷 Foto de la guía'"></label>
+    <label>Transportadora<select class="sel" id="env-t" onchange="$('env-fb').style.display=this.value==='Privada'?'none':'flex'">${envTrans.map(v=>`<option${v===t?' selected':''}>${esc(v)}</option>`).join('')}</select></label>
+    <label class="btn-fs" id="env-fb" style="display:${t==='Privada'?'none':'flex'};align-items:center;justify-content:center;flex-direction:row;color:var(--text)">📷 Foto de la guía<input type="file" id="env-f" accept="image/*" hidden onchange="this.parentNode.firstChild.textContent=this.files[0]?'Foto lista ✓ · toca para cambiarla':'📷 Foto de la guía'"></label>
     <div class="bt"><button class="btn-ok" id="env-ok" onclick="envDespachar(${i})">Guardar despacho</button><button class="btn-fs" onclick="envForm=null;pintarEnvios()">Cancelar</button></div>
   </div>`;
 }
