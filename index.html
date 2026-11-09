@@ -316,11 +316,12 @@ button,a,label,select,input,textarea,.tab,.ficha{touch-action:manipulation}
             <option value="15" selected>Últimos 15 días</option><option value="30">Últimos 30 días</option>
             <option value="90">Últimos 90 días</option>
           </select>
-          <button class="btn-fs" onclick="rotMarcarListos()">Seleccionar todos los listos</button>
+          <button class="btn-fs" onclick="rotMarcarListos()">Seleccionar todo</button>
           <button class="btn-fs" onclick="rotDesmarcar()">Desmarcar</button>
           <button class="btn-fs" id="b-rot-desp" onclick="rotVerDespachados()">Ver despachados</button>
         </div>
       </div>
+      <input type="search" class="search" id="rot-q" placeholder="Buscar nombre, cédula, celular, ciudad, producto o #..." oninput="pintarRotulos()" style="margin-bottom:10px" aria-label="Buscar rótulos"/>
       <div id="rot-confirma"></div>
       <div id="rot-aviso"></div>
       <div id="rot-lista"><div class="loading">Cargando...</div></div>
@@ -854,7 +855,17 @@ const rotFalta = x => ['persona','cedula','numero'].filter(k=>!x[k]).concat(rotL
 const rotItems = p => String(p||'').split('|').map(s=>s.trim()).filter(Boolean);
 const rotElegidos = () => rotulos.filter(x=>rotSel.has(x.id));
 const ROT_ESPERA=['POR REVISAR','POR PEDIR','EN CHINA','EN CAMINO'], ROT_LISTO=['POR DESPACHAR','PREPARANDO'], ROT_SALIO=['DESPACHADO','ENTREGADO'];
-const rotPreseleccion = x => ROT_LISTO.includes(x.estado) && !x.impresiones && !rotFalta(x).length;
+// Búsqueda sin tildes ni mayúsculas; el celular y la cédula también se encuentran solo por dígitos.
+const rotNorm = t => String(t||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+function rotCoincide(x,q){
+  if(!q) return true;
+  const txt=rotNorm([x.id,'#'+x.id,x.persona,x.cedula,x.numero,x.ciudad,x.departamento,x.producto,x.estado].join(' '));
+  const dig=q.replace(/\D/g,'');
+  return q.split(/\s+/).every(w=>txt.includes(w)) || (dig.length>=4 && [x.cedula,x.numero].some(v=>String(v||'').replace(/\D/g,'').includes(dig)));
+}
+const rotQ = () => rotNorm($('rot-q').value).trim();
+const rotImprimible = x => ROT_LISTO.includes(x.estado) && !rotFalta(x).length;
+const rotPreseleccion = x => rotImprimible(x) && !x.impresiones;
 
 async function cargarRotulos(){
   $('rot-lista').innerHTML='<div class="loading">Cargando...</div>';
@@ -894,14 +905,18 @@ function pintarRotulos(){
     <div class="card"><div class="lbl">Despachados</div><div class="val green">${des.length}</div><div class="sub">En este período</div></div>`;
   $('rot-n').textContent=`Rótulos (${por.length} por despachar)`;
   $('rot-aviso').innerHTML=inc?`<div class="aviso"><b>${inc} pedido(s) con datos incompletos</b> (en rojo). Corrige el dato en el registro de Despachos y recarga: aquí no se inventa.</div>`:'';
+  const q=rotQ(), f=l=>l.filter(x=>rotCoincide(x,q));
   const grupo=(t,l)=>l.length?`<div class="ct" style="margin:16px 0 8px">${t} (${l.length})</div>`+l.map(rotFila).join(''):'';
-  const html=grupo('Por despachar',por)+grupo('Importación en camino — cuando llegue, márcala «Ya llegó»',cam)+(rotVerDesp?grupo('Despachados',des):'');
-  $('rot-lista').innerHTML=html||`<div class="vacio"><div class="big">✅</div><div>No hay pedidos en este período.</div></div>`;
+  const html=grupo('Por despachar',f(por))+grupo('Importación en camino — cuando llegue, márcala «Ya llegó»',f(cam))+(rotVerDesp?grupo('Despachados',f(des)):'');
+  $('rot-lista').innerHTML=html||(q?`<div class="vacio"><div>Nada coincide con «${esc($('rot-q').value.trim())}».</div></div>`:`<div class="vacio"><div class="big">✅</div><div>No hay pedidos en este período.</div></div>`);
   rotResumen();
 }
 
 function rotToggle(i,v){ const x=rotulos[i]; if(!x) return; if(v) rotSel.add(x.id); else rotSel.delete(x.id); rotResumen(); }
-function rotMarcarListos(){ rotSel=new Set(rotulos.filter(x=>ROT_LISTO.includes(x.estado)&&!rotFalta(x).length).map(x=>x.id)); pintarRotulos(); }
+// «Seleccionar todo» marca lo que se puede imprimir dentro de lo que muestra la búsqueda (sin búsqueda, todos los listos).
+function rotMarcarListos(){ const q=rotQ(), l=rotulos.filter(x=>rotImprimible(x)&&rotCoincide(x,q));
+  if(!l.length){ toast(q?'Nada listo para imprimir en esta búsqueda':'No hay rótulos listos para imprimir','err'); return; }
+  l.forEach(x=>rotSel.add(x.id)); pintarRotulos(); }
 function rotDesmarcar(){ rotSel=new Set(); pintarRotulos(); }
 function rotVerDespachados(){ rotVerDesp=!rotVerDesp;
   // Al esconderlos, también salen de lo marcado: si no, se imprimirían sin verse.
@@ -909,7 +924,8 @@ function rotVerDespachados(){ rotVerDesp=!rotVerDesp;
 function rotResumen(){
   const n=rotSel.size;
   const vac=(4-n%4)%4;
-  $('rot-resumen').innerHTML=n?`${n} marcado(s) · ${Math.ceil(n/4)} hoja(s) carta`+(vac?` · <b style="color:var(--amber)">la última hoja queda con ${vac} espacio(s) vacío(s)</b>`:' · hojas completas ✓'):'Marca los pedidos con los que vas a trabajar';
+  const q=rotQ(), ocultos=q?rotulos.filter(x=>rotSel.has(x.id)&&!rotCoincide(x,q)).length:0;
+  $('rot-resumen').innerHTML=n?`${n} marcado(s)`+(ocultos?` <b style="color:var(--amber)">(${ocultos} fuera de la búsqueda)</b>`:'')+` · ${Math.ceil(n/4)} hoja(s) carta`+(vac?` · <b style="color:var(--amber)">la última hoja queda con ${vac} espacio(s) vacío(s)</b>`:' · hojas completas ✓'):'Marca los pedidos con los que vas a trabajar';
   $('rot-btn').disabled=!n;
 }
 
