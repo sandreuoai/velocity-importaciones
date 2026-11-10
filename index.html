@@ -279,13 +279,16 @@ button,a,label,select,input,textarea,.tab,.ficha{touch-action:manipulation}
     </div>
 
     <div class="page active" id="pg-envios">
-      <p class="pista"><b>Aquí avanzas cada pedido hasta que le llega al cliente.</b> Cada venta nueva llega en «Revisar bodega»: busca cada prenda y márcala. Desde «Por preparar», cada cambio le avisa al cliente por WhatsApp</p>
+      <p class="pista"><b>Aquí avanzas cada pedido hasta que le llega al cliente.</b> Cada venta nueva llega en «Revisar bodega»: busca cada prenda y márcala. Desde «Listo para despachar», cada cambio le avisa al cliente por WhatsApp</p>
       <div id="pendientes"></div>
       <div id="env-aviso"></div>
       <div class="fichas" id="env-fichas" role="tablist" aria-label="Filtrar por estado"></div>
       <input type="search" class="search" id="env-q" placeholder="Buscar cliente, producto, celular o guía..." oninput="pintarEnvios()" style="margin-bottom:10px"/>
       <div class="hdr" style="flex-direction:row;align-items:center;justify-content:space-between;margin-top:6px">
         <span class="t" id="env-n">Envíos</span>
+        <select class="sel" id="env-orden" style="width:auto" onchange="pintarEnvios()" aria-label="Orden de los pedidos">
+          <option value="NUEVOS" selected>Más recientes primero</option><option value="VENCE">Por vencer primero</option>
+        </select>
         <select class="sel" id="env-dias" style="width:auto" onchange="cargarEnvios()" aria-label="Despachados y entregados de cuántos días">
           <option value="15">Despachados: 15 días</option><option value="30" selected>Despachados: 30 días</option><option value="90">Despachados: 90 días</option>
         </select>
@@ -300,6 +303,9 @@ button,a,label,select,input,textarea,.tab,.ficha{touch-action:manipulation}
       <input type="search" class="search" id="ped-q" placeholder="Buscar cliente o camiseta..." oninput="pintarPedir()" style="margin-bottom:10px"/>
       <div class="hdr" style="flex-direction:row;align-items:center;justify-content:space-between;margin-top:6px">
         <span class="t" id="ped-n">Por pedir</span>
+        <select class="sel" id="ped-orden" style="width:auto" onchange="pintarPedir()" aria-label="Orden de las prendas">
+          <option value="NUEVOS" selected>Más recientes primero</option><option value="VENCE">Por vencer primero</option>
+        </select>
         <button class="btn-fs" onclick="pedTodos()" id="ped-todos">Elegir todas</button>
       </div>
       <div id="ped-lista"><div class="loading">Cargando...</div></div>
@@ -592,6 +598,12 @@ async function cargarEnvios(){
 
 // Abiertos (por defecto): todo lo que Juan Pablo aún mueve. Despachado y Entregado solo con su ficha (Andreu, 2026-10-28).
 const envGrupo={ABIERTOS:['POR REVISAR','POR PEDIR','EN CHINA','EN CAMINO','POR DESPACHAR','PAUSADO'],HACER:['POR REVISAR','POR DESPACHAR'],PAUSADO:['PAUSADO'],'POR PEDIR':['POR PEDIR'],'EN CHINA':['EN CHINA'],'EN CAMINO':['EN CAMINO'],DESPACHADO:['DESPACHADO'],ENTREGADO:['ENTREGADO']};
+// Orden (Andreu, 2026-11-10): por defecto lo recién vendido arriba, para que no se pida tarde; «Por vencer» pone
+// arriba la fecha prometida al cliente más cercana (sin fecha, al final).
+function ordenar(l,modo){
+  const nuevos=(a,b)=>(b.fecha||'').localeCompare(a.fecha||'')||(Number(b.id)||0)-(Number(a.id)||0)||(a.idx||0)-(b.idx||0);
+  return l.slice().sort(modo==='VENCE'?(a,b)=>(a.limite||'9999').localeCompare(b.limite||'9999')||-nuevos(a,b):nuevos);
+}
 function envFiltro(v){ envF=v; envForm=null; pintarEnvios(); }
 
 function pintarEnvios(){
@@ -601,6 +613,7 @@ function pintarEnvios(){
   const q=($('env-q').value||'').toLowerCase().trim();
   let l=q?envios:envios.filter(x=>envGrupo[envF].includes(x.estado));   // la búsqueda mira todos los estados
   if(q) l=l.filter(x=>[x.persona,x.producto,x.numero,x.guia,x.id,x.shopify&&x.shopify.pedido].some(v=>String(v||'').toLowerCase().includes(q)));
+  l=ordenar(l,$('env-orden').value);
   $('env-n').textContent=(q?'Resultados':{ABIERTOS:'Abiertos',HACER:'Por hacer','POR PEDIR':'Por pedir a Pacho','EN CHINA':'Pedido a China','EN CAMINO':'Viene para Colombia',PAUSADO:'Pausados',DESPACHADO:'Despachados',ENTREGADO:'Entregados'}[envF])+` (${l.length})`;
   if(!l.length){ $('env-lista').innerHTML=`<div class="vacio"><div class="big">✅</div><div>${q?'Ningún pedido coincide.':'No hay pedidos aquí.'}</div></div>`; return; }
   $('env-lista').innerHTML=l.map(envTarjeta).join('');
@@ -682,8 +695,10 @@ async function envOrigen(i,origen){
     else{
       (x.prendas||[]).forEach(p=>{ if(r.origen[p.idx]) p.origen=r.origen[p.idx]; });
       const antes=x.estado; x.estado=r.estado; x.importacion=r.importacion; if(r.limite) x.limite=r.limite;
+      const s=r.shopify||{};   // todo en bodega: Shopify queda «Preparado» (sin correo)
+      if(s.aplica){ x.shopifyAviso=s.ok===false?s.mensaje:''; if(s.pedido) x.shopifyPedido=s.pedido; if(s.ok&&x.shopify) x.shopify.estado='FULFILLED'; }
       if(r.estado!=='POR REVISAR') envOrigenAbierto=null;
-      if(r.estado!==antes) toast(r.estado==='POR PEDIR'?'Pasa a «Pedir a Pacho» ✓':r.estado==='POR DESPACHAR'?'Todo en bodega: queda «Por preparar» ✓':'Guardado ✓');
+      if(r.estado!==antes) toast(r.estado==='POR PEDIR'?'Pasa a «Pedir a Pacho» ✓':r.estado==='POR DESPACHAR'?'Todo en bodega: «Listo para despachar» y en Shopify «Preparado» ✓':'Guardado ✓');
       else toast('Guardado ✓');
     }
   }catch(e){ toast('No se pudo guardar: '+errTxt(e),'err'); }
@@ -1152,7 +1167,7 @@ async function cargarPedir(){
 }
 function pedVisibles(){
   const q=($('ped-q').value||'').toLowerCase().trim();
-  return q?pedL.filter(x=>[x.persona,x.titulo,x.dorsal,x.id].some(v=>String(v||'').toLowerCase().includes(q))):pedL;
+  return ordenar(q?pedL.filter(x=>[x.persona,x.titulo,x.dorsal,x.id].some(v=>String(v||'').toLowerCase().includes(q))):pedL,$('ped-orden').value);
 }
 function pintarPedir(){
   const l=pedVisibles();
