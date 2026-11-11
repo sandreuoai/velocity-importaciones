@@ -644,10 +644,11 @@ async function cargarEnvios(opts){
   }catch(e){ envSync(''); if(envios.length) toast('No se pudo actualizar: '+errTxt(e),'err'); else $('env-lista').innerHTML='<div class="vacio">Error de conexión</div>'; return null; }
 }
 
-// Abiertos (por defecto): todo lo que Juan Pablo aún mueve. Despachado y Entregado solo con su ficha (Andreu, 2026-10-28).
-// «Revisar o despachar» (antes «Por hacer»; Andreu, 2026-11-11: no se entendía) junta Revisar bodega y Listo para despachar.
+// «Por despachar» (por defecto; antes «Abiertos», Andreu 2026-11-11): todo lo que aún no sale. Despachado y Entregado solo con su ficha (Andreu, 2026-10-28).
+// «Le toca a bodega» (antes «Por hacer» y «Revisar o despachar»; Andreu, 2026-11-11: no se entendía) junta Revisar bodega y
+// Listo para despachar: lo que se mueve ya sin esperar a nadie. No es «por vencer»: eso es el orden «Por vencer primero».
 const envGrupo={ABIERTOS:['POR REVISAR','POR PEDIR','EN CHINA','EN CAMINO','POR DESPACHAR','PAUSADO'],HACER:['POR REVISAR','POR DESPACHAR'],PAUSADO:['PAUSADO'],'POR PEDIR':['POR PEDIR'],'EN CHINA':['EN CHINA'],'EN CAMINO':['EN CAMINO'],DESPACHADO:['DESPACHADO'],ENTREGADO:['ENTREGADO']};
-const envNombre={ABIERTOS:'Abiertos',HACER:'Revisar o despachar','POR PEDIR':'Por pedir a Pacho','EN CHINA':'Pedido a China','EN CAMINO':'Viene para Colombia',PAUSADO:'Pausados',DESPACHADO:'Despachados',ENTREGADO:'Entregados'};
+const envNombre={ABIERTOS:'Por despachar',HACER:'Le toca a bodega','POR PEDIR':'Por pedir a Pacho','EN CHINA':'Pedido a China','EN CAMINO':'Viene para Colombia',PAUSADO:'Pausados',DESPACHADO:'Despachados',ENTREGADO:'Entregados'};
 const envDe={}; Object.entries(envGrupo).forEach(([k,l])=>l.forEach(e=>(envDe[e]=envDe[e]||[]).push(k)));   // estado → fichas donde cuenta
 // Orden (Andreu, 2026-11-10): por defecto lo recién vendido arriba, para que no se pida tarde; «Por vencer» pone
 // arriba la fecha prometida al cliente más cercana (sin fecha, al final).
