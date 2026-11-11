@@ -71,6 +71,9 @@ main{padding:14px 16px 24px;max-width:1300px;margin:0 auto}
 .hdr .t{font-size:15px;font-weight:600}
 .hdr .acc{display:flex;flex-direction:column;gap:8px}
 .hdr .acc>*{width:100%}
+.hdr-fila{flex-direction:row;flex-wrap:wrap;align-items:center;gap:8px;margin-top:6px}
+.hdr-fila .t{flex:1 1 100%;white-space:nowrap}
+.hdr-fila .sel,.hdr-fila .btn-fs{width:auto;flex:1 1 auto}
 /* ---- pedidos ---- */
 .pedido{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:10px}
 .pedido.pend{border-left:3px solid var(--amber)}
@@ -194,6 +197,9 @@ main{padding:14px 16px 24px;max-width:1300px;margin:0 auto}
   .hdr{flex-direction:row;align-items:center;justify-content:space-between;flex-wrap:wrap}
   .hdr .acc{flex-direction:row;align-items:center;flex-wrap:wrap}
   .hdr .acc>*{width:auto}
+  .hdr-fila{justify-content:space-between}
+  .hdr-fila .t{flex:1 1 auto}
+  .hdr-fila .sel,.hdr-fila .btn-fs{flex:0 0 auto}
   .search{width:240px;min-height:36px;font-size:13px}
   .sel{width:auto;min-height:36px;font-size:13px}
   .ptop{flex-direction:row;justify-content:space-between;align-items:flex-start;gap:12px}
@@ -232,20 +238,21 @@ button,a,label,select,input,textarea,.tab,.ficha{touch-action:manipulation}
 /* iOS acerca la pantalla si un campo tiene letra bajo 16px, también en iPad */
 .fi,.search,.sel,.pctrl .obs,input,select,textarea{font-size:16px}
 #hoja-impresion{display:none}
-@page{size:letter;margin:0}
+@page{size:letter;margin:5mm}
 @media print{
   body.imprimiendo{background:#fff}
   body.imprimiendo #app,body.imprimiendo #login,body.imprimiendo .toast{display:none!important}
   body.imprimiendo #hoja-impresion{display:block}
-  .hoja{width:215.9mm;height:279mm;padding:4mm;box-sizing:border-box;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;page-break-after:always;break-after:page}
+  /* Filas fijas de 125 mm: 250 mm + márgenes cabe en carta (279 mm) aunque iOS imponga los suyos; con 1fr y 279 mm fijos la hoja se partía. */
+  .hoja{width:100%;padding:0;box-sizing:border-box;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:125mm 125mm;page-break-after:always;break-after:page;page-break-inside:avoid;break-inside:avoid}
   .hoja:last-child{page-break-after:auto;break-after:auto}
-  .rotulo{border:1px dashed #888;padding:9mm 8mm;color:#000;font-family:Arial,Helvetica,sans-serif;overflow:hidden;display:flex;flex-direction:column;gap:3.2mm}
+  .rotulo{border:1px dashed #888;padding:8mm 7mm;box-sizing:border-box;min-height:0;min-width:0;page-break-inside:avoid;break-inside:avoid;color:#000;font-family:Arial,Helvetica,sans-serif;overflow:hidden;display:flex;flex-direction:column;gap:3.2mm}
   .rotulo .marca{font-size:9pt;font-weight:700;letter-spacing:.5px;border-bottom:1.5px solid #000;padding-bottom:2mm}
   .rotulo .campo small{display:block;font-size:7.5pt;text-transform:uppercase;color:#444;letter-spacing:.6px}
   .rotulo .campo span{font-size:15pt;font-weight:700;line-height:1.2;word-break:break-word}
   .rotulo .campo span.cel{font-size:17pt}
   .rotulo .campo ul{margin:0;padding-left:5mm;font-size:11pt;font-weight:600;line-height:1.3}
-  .rotulo .campo ul.chico{font-size:9pt}
+  .rotulo .campo ul.chico{font-size:8.5pt;line-height:1.2}
 }
 </style>
 </head>
@@ -284,7 +291,7 @@ button,a,label,select,input,textarea,.tab,.ficha{touch-action:manipulation}
       <div id="env-aviso"></div>
       <div class="fichas" id="env-fichas" role="tablist" aria-label="Filtrar por estado"></div>
       <input type="search" class="search" id="env-q" placeholder="Buscar cliente, producto, celular o guía..." oninput="pintarEnvios()" style="margin-bottom:10px"/>
-      <div class="hdr" style="flex-direction:row;align-items:center;justify-content:space-between;margin-top:6px">
+      <div class="hdr hdr-fila">
         <span class="t" id="env-n">Envíos</span>
         <select class="sel" id="env-orden" style="width:auto" onchange="pintarEnvios()" aria-label="Orden de los pedidos">
           <option value="NUEVOS" selected>Más recientes primero</option><option value="VENCE">Por vencer primero</option>
@@ -301,7 +308,7 @@ button,a,label,select,input,textarea,.tab,.ficha{touch-action:manipulation}
       <div id="ped-aviso"></div>
       <div id="ped-listo"></div>
       <input type="search" class="search" id="ped-q" placeholder="Buscar cliente o camiseta..." oninput="pintarPedir()" style="margin-bottom:10px"/>
-      <div class="hdr" style="flex-direction:row;align-items:center;justify-content:space-between;margin-top:6px">
+      <div class="hdr hdr-fila">
         <span class="t" id="ped-n">Por pedir</span>
         <select class="sel" id="ped-orden" style="width:auto" onchange="pintarPedir()" aria-label="Orden de las prendas">
           <option value="NUEVOS" selected>Más recientes primero</option><option value="VENCE">Por vencer primero</option>
@@ -334,7 +341,7 @@ button,a,label,select,input,textarea,.tab,.ficha{touch-action:manipulation}
       <div class="barra-imp">
         <span id="rot-resumen" style="font-size:14px;color:var(--muted)"></span>
         <div class="acc">
-          <button class="btn-fs" onclick="rotCambiar('POR DESPACHAR')">Ya llegó / reabrir</button>
+          <button class="btn-fs" onclick="rotCambiar('POR DESPACHAR')">Reabrir despachado</button>
           <button class="btn-primary" id="rot-btn" onclick="rotImprimir()">Imprimir</button>
         </div>
       </div>
@@ -860,7 +867,7 @@ function envRevisarWa(id){
 // RÓTULOS — 4 por hoja carta, para pegar al lado de la guía de la transportadora.
 // El servidor decide el estado de cada pedido y lo guarda (hoja «Despacho»), así que lo que se
 // marca aquí lo ve cualquier aparato y cualquier persona:
-//   EN CHINA / EN CAMINO (importación que aún no llega: no se rotula) · POR DESPACHAR y PREPARANDO (se rotulan)
+//   EN CHINA / EN CAMINO (importación en camino: se rotula cuando llega, y esa impresión la pasa a POR DESPACHAR) · POR DESPACHAR y PREPARANDO (listos)
 //   · DESPACHADO y ENTREGADO. El despacho se marca en Envíos, con la guía.
 // Datos del rótulo: id, numero (celular), persona, cedula, ciudad, departamento, producto.
 // Lo que falte sale en rojo y no deja imprimir; nunca se inventa.
@@ -915,14 +922,14 @@ function pintarRotulos(){
   const inc=por.filter(x=>rotFalta(x).length).length;
   $('c-rot').innerHTML=`
     <div class="card"><div class="lbl">Por despachar</div><div class="val ${por.length?'amber':'green'}">${por.length}</div><div class="sub">Listos para rotular · se despachan en Envíos</div></div>
-    <div class="card"><div class="lbl">Importación en camino</div><div class="val">${cam.length}</div><div class="sub">Esperando «Ya llegó»</div></div>
+    <div class="card"><div class="lbl">Importación en camino</div><div class="val">${cam.length}</div><div class="sub">Se liberan al imprimir su rótulo</div></div>
     <div class="card"><div class="lbl">Datos incompletos</div><div class="val ${inc?'red':'green'}">${inc}</div><div class="sub">${inc?'No se pueden imprimir':'Todo completo'}</div></div>
     <div class="card"><div class="lbl">Despachados</div><div class="val green">${des.length}</div><div class="sub">En este período</div></div>`;
   $('rot-n').textContent=`Rótulos (${por.length} por despachar)`;
   $('rot-aviso').innerHTML=inc?`<div class="aviso"><b>${inc} pedido(s) con datos incompletos</b> (en rojo). Corrige el dato en el registro de Despachos y recarga: aquí no se inventa.</div>`:'';
   const q=rotQ(), f=l=>l.filter(x=>rotCoincide(x,q));
   const grupo=(t,l)=>l.length?`<div class="ct" style="margin:16px 0 8px">${t} (${l.length})</div>`+l.map(rotFila).join(''):'';
-  const html=grupo('Por despachar',f(por))+grupo('Importación en camino — cuando llegue, márcala «Ya llegó»',f(cam))+(rotVerDesp?grupo('Despachados',f(des)):'');
+  const html=grupo('Por despachar',f(por))+grupo('Importación en camino — cuando llegue, imprime su rótulo',f(cam))+(rotVerDesp?grupo('Despachados',f(des)):'');
   $('rot-lista').innerHTML=html||(q?`<div class="vacio"><div>Nada coincide con «${esc($('rot-q').value.trim())}».</div></div>`:`<div class="vacio"><div class="big">✅</div><div>No hay pedidos en este período.</div></div>`);
   rotResumen();
 }
@@ -944,20 +951,20 @@ function rotResumen(){
   $('rot-btn').disabled=!n;
 }
 
-// Cambia el estado en el servidor. «POR DESPACHAR» sirve para liberar una importación que ya llegó
-// y para reabrir un pedido que se marcó despachado por error.
+// Cambia el estado en el servidor. «POR DESPACHAR» reabre un pedido que se marcó despachado por error;
+// la importación que llega se libera al imprimir su rótulo (rotConfirmar).
 async function rotCambiar(estado){
   if(rotBusy) return;
   const sel=rotElegidos();
   if(!sel.length){ toast('Marca al menos un pedido','err'); return; }
-  const ids=sel.filter(x=>x.estado!==estado);
-  if(!ids.length){ toast(estado==='ENTREGADO'?'Eso ya está entregado':'Eso ya está «por preparar»','err'); return; }
+  // Reabrir solo aplica a lo que salió (DESPACHADO/ENTREGADO). Lo que está en camino se libera imprimiendo su rótulo.
+  const ids=sel.filter(x=>x.estado!==estado&&(estado!=='POR DESPACHAR'||ROT_SALIO.includes(x.estado)));
+  if(!ids.length){ toast(estado==='ENTREGADO'?'Eso ya está entregado':'Solo se reabre lo despachado. Lo que viene en camino se libera al imprimir su rótulo.','err'); return; }
   let pregunta;
   if(estado==='ENTREGADO'){
     pregunta=`¿Marcar ${ids.length} pedido(s) como ENTREGADOS?\n\nEs para cerrar pedidos que ya llegaron antes de la pestaña Envíos. No se le avisa nada al cliente ni a Shopify.`;
   }else{
-    const cam=ids.filter(x=>ROT_ESPERA.includes(x.estado)).length, des=ids.length-cam;
-    pregunta=(cam?`¿Ya llegó el producto de ${cam} pedido(s) de importación? Quedan listos para rotular y a cada cliente le llega un WhatsApp de que su pedido está en bodega.\n`:'')+(des?`¿Reabrir ${des} pedido(s)? Vuelven a «por preparar». En Shopify no se deshace nada.`:'');
+    pregunta=`¿Reabrir ${ids.length} pedido(s)? Vuelven a «Listo para despachar». En Shopify no se deshace nada.`;
   }
   if(!confirm(pregunta)) return;
   rotBusy=true;
@@ -996,10 +1003,10 @@ function rotImprimir(){
   if(rotBusy) return;
   const l=rotElegidos();
   if(!l.length) return;
-  if(l.some(x=>ROT_ESPERA.includes(x.estado))){ toast('Hay importaciones que todavía no llegan. Márcalas «Ya llegó» o desmárcalas.','err'); return; }
   if(l.some(x=>rotFalta(x).length)){ toast('Hay rótulos con datos incompletos. Desmárcalos o corrígelos.','err'); return; }
   const vac=(4-l.length%4)%4;
-  const aviso=`Vas a imprimir ${l.length} rótulo(s) en ${Math.ceil(l.length/4)} hoja(s) carta.`+(vac?`\n\nOJO: la última hoja saldrá con ${vac} espacio(s) vacío(s). ${l.length===1?'Si tienes más pedidos listos, márcalos para aprovechar la hoja.':'¿Seguro que no faltan pedidos por marcar?'}`:'')+`\n\nEn la ventana de impresión: tamaño Carta, escala 100% y márgenes «Ninguno».`;
+  const cam=l.filter(x=>ROT_ESPERA.includes(x.estado)).length;
+  const aviso=`Vas a imprimir ${l.length} rótulo(s) en ${Math.ceil(l.length/4)} hoja(s) carta.`+(cam?`\n\n${cam} figura(n) todavía en camino: al confirmar que salieron bien quedan «Listo para despachar» y a cada cliente le llega el WhatsApp de que su pedido ya está en bodega.`:'')+(vac?`\n\nOJO: la última hoja saldrá con ${vac} espacio(s) vacío(s). ${l.length===1?'Si tienes más pedidos listos, márcalos para aprovechar la hoja.':'¿Seguro que no faltan pedidos por marcar?'}`:'')+`\n\nEn la ventana de impresión: tamaño Carta, escala 100% y márgenes «Ninguno».`;
   if(!confirm(aviso)) return;
   const rep=l.filter(x=>x.impresiones>0);
   if(rep.length){
@@ -1026,6 +1033,14 @@ async function rotConfirmar(ok){
   try{
     const r=await post({action:'rot_impreso',ids:l.map(x=>x.id)});
     if(r.error) toast(r.error,'err'); else toast('Impresión registrada');
+    // Imprimir el rótulo es la señal de que la importación llegó (no hay botón «Ya llegó» desde 2026-11-10):
+    // el servidor la deja «Listo para despachar» y le manda al cliente el WhatsApp de bodega.
+    const cam=l.filter(x=>ROT_ESPERA.includes(x.estado));
+    if(cam.length){
+      const e=await post({action:'rot_estado',ids:cam.map(x=>x.id),estado:'POR DESPACHAR'});
+      if(e.error) toast('Impresos, pero no pude dejarlos «Listo para despachar»: '+e.error,'err');
+      else{ const w=e.whatsapp||{enviados:0,fallaron:[]}; toast(`${e.cambiados} pedido(s) listos para despachar`+(w.enviados?` · ${w.enviados} WhatsApp enviados`:'')+(w.fallaron.length?` · ${w.fallaron.length} sin WhatsApp: míralos en Envíos`:''), w.fallaron.length?'err':'ok'); }
+    }
   }catch(e){ toast('No se pudo registrar la impresión: '+errTxt(e),'err'); }
   finally{ rotBusy=false; }
   await cargarRotulos();
