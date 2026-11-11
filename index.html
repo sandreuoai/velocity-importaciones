@@ -297,7 +297,7 @@ button,a,label,select,input,textarea,.tab,.ficha{touch-action:manipulation}
     </div>
 
     <div class="page active" id="pg-envios">
-      <p class="pista"><b>Aquí avanzas cada pedido hasta que le llega al cliente.</b> Cada venta nueva llega en «Revisar bodega»: busca cada prenda y márcala. Desde «Listo para despachar», cada cambio le avisa al cliente por WhatsApp</p>
+      <p class="pista"><b>Aquí avanzas cada pedido hasta que le llega al cliente.</b> Cada venta nueva llega en «Mirar si hay en bodega»: busca cada prenda y márcala. Desde «Listo para despachar», cada cambio le avisa al cliente por WhatsApp</p>
       <div id="pendientes"></div>
       <div id="env-aviso"></div>
       <div class="fichas" id="env-fichas" role="tablist" aria-label="Filtrar por estado"></div>
@@ -606,7 +606,7 @@ async function avisoCostos(){
 // y Shopify le manda el correo al cliente) y «entregado». «En China» y «Viene para Colombia» son internos.
 // Al cambiar el estado (salvo En China y Viene para Colombia) el servidor le manda al cliente la plantilla de WhatsApp
 // del estado. Si no sale o el número no tiene WhatsApp, la tarjeta dice a quién llamar o escribir.
-const EST_ENV=[['POR REVISAR','Revisar bodega'],['POR PEDIR','Por pedir a Pacho'],['EN CHINA','Pedido a China'],['EN CAMINO','Viene para Colombia'],['POR DESPACHAR','Listo para despachar'],['PAUSADO','Pausado'],['DESPACHADO','Despachado'],['ENTREGADO','Entregado']];
+const EST_ENV=[['POR REVISAR','Mirar si hay en bodega'],['POR PEDIR','Por pedir a Pacho'],['EN CHINA','Pedido a China'],['EN CAMINO','Viene para Colombia'],['POR DESPACHAR','Listo para despachar'],['PAUSADO','Pausado'],['DESPACHADO','Despachado'],['ENTREGADO','Entregado']];
 const EST_TXT=Object.fromEntries(EST_ENV);
 const SHOP_TXT={UNFULFILLED:'sin preparar',OPEN:'sin preparar',IN_PROGRESS:'en preparación',FULFILLED:'enviado',PARTIALLY_FULFILLED:'enviado en parte',ON_HOLD:'en espera',SCHEDULED:'programado',PENDING_FULFILLMENT:'pendiente'};
 let envios=[], envF='ABIERTOS', envForm=null, envBusy=false, envTrans=['Interrapidísimo'];
@@ -645,10 +645,10 @@ async function cargarEnvios(opts){
 }
 
 // «Todos pendientes» (por defecto): todo lo que aún no sale. Despachado y Entregado solo con su ficha (Andreu, 2026-10-28).
-// «Por revisar» y «Por despachar» van aparte y de segundas (Andreu, 2026-11-11: «todo debe ser para tontos»; antes iban
+// «Mirar si hay en bodega» y «Por despachar» van aparte y de segundas (Andreu, 2026-11-11: «todo debe ser para tontos»; antes iban
 // juntas como «Le toca a bodega» y no se entendía): lo que bodega mueve ya, sin esperar a nadie.
 const envGrupo={ABIERTOS:['POR REVISAR','POR PEDIR','EN CHINA','EN CAMINO','POR DESPACHAR','PAUSADO'],'POR REVISAR':['POR REVISAR'],'POR DESPACHAR':['POR DESPACHAR'],PAUSADO:['PAUSADO'],'POR PEDIR':['POR PEDIR'],'EN CHINA':['EN CHINA'],'EN CAMINO':['EN CAMINO'],DESPACHADO:['DESPACHADO'],ENTREGADO:['ENTREGADO']};
-const envNombre={ABIERTOS:'Todos pendientes','POR REVISAR':'Por revisar','POR DESPACHAR':'Por despachar','POR PEDIR':'Por pedir a Pacho','EN CHINA':'Pedido a China','EN CAMINO':'Viene para Colombia',PAUSADO:'Pausados',DESPACHADO:'Despachados',ENTREGADO:'Entregados'};
+const envNombre={ABIERTOS:'Todos pendientes','POR REVISAR':'Mirar si hay en bodega','POR DESPACHAR':'Por despachar','POR PEDIR':'Por pedir a Pacho','EN CHINA':'Pedido a China','EN CAMINO':'Viene para Colombia',PAUSADO:'Pausados',DESPACHADO:'Despachados',ENTREGADO:'Entregados'};
 const envDe={}; Object.entries(envGrupo).forEach(([k,l])=>l.forEach(e=>(envDe[e]=envDe[e]||[]).push(k)));   // estado → fichas donde cuenta
 // Orden (Andreu, 2026-11-10): por defecto lo recién vendido arriba, para que no se pida tarde; «Por vencer» pone
 // arriba la fecha prometida al cliente más cercana (sin fecha, al final).
