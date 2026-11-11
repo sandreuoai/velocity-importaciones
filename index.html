@@ -164,6 +164,10 @@ main{padding:14px 16px 24px;max-width:1300px;margin:0 auto}
 .chip-shop{background:rgba(42,120,214,.12);color:#8ab8f0;border:1px solid rgba(42,120,214,.3)}
 .chip-err{background:rgba(248,113,113,.12);color:#f87171;border:1px solid rgba(248,113,113,.3)}
 .env-guia{font-size:13px;color:var(--text);margin-top:6px}
+.env-sync{font-size:12px;font-weight:400;color:var(--muted);margin-left:6px}
+.env-mas{width:100%;margin:4px 0 10px}
+/* Foco visible al navegar con teclado o lector (accesibilidad): el mismo azul de los enlaces, sin tocar la paleta */
+button:focus-visible,a:focus-visible,select:focus-visible,input:focus-visible,label:focus-visible,summary:focus-visible{outline:2px solid #8ab8f0;outline-offset:2px}
 .env-form{display:flex;flex-direction:column;gap:10px;background:var(--surface2);border:1px solid var(--border-strong);border-radius:var(--radius);padding:12px}
 .env-form label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted)}
 .env-form .bt{display:flex;gap:8px;flex-wrap:wrap}.env-form .bt>*{flex:1 1 140px}
@@ -244,15 +248,16 @@ button,a,label,select,input,textarea,.tab,.ficha{touch-action:manipulation}
   body.imprimiendo #app,body.imprimiendo #login,body.imprimiendo .toast{display:none!important}
   body.imprimiendo #hoja-impresion{display:block}
   /* Filas fijas de 125 mm: 250 mm + márgenes cabe en carta (279 mm) aunque iOS imponga los suyos; con 1fr y 279 mm fijos la hoja se partía. */
-  .hoja{width:100%;padding:0;box-sizing:border-box;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:125mm 125mm;page-break-after:always;break-after:page;page-break-inside:avoid;break-inside:avoid}
+  .hoja{width:100%;padding:0;box-sizing:border-box;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:60mm 60mm 60mm 60mm;page-break-after:always;break-after:page;page-break-inside:avoid;break-inside:avoid}
   .hoja:last-child{page-break-after:auto;break-after:auto}
-  .rotulo{border:1px dashed #888;padding:8mm 7mm;box-sizing:border-box;min-height:0;min-width:0;page-break-inside:avoid;break-inside:avoid;color:#000;font-family:Arial,Helvetica,sans-serif;overflow:hidden;display:flex;flex-direction:column;gap:3.2mm}
-  .rotulo .marca{font-size:9pt;font-weight:700;letter-spacing:.5px;border-bottom:1.5px solid #000;padding-bottom:2mm}
-  .rotulo .campo small{display:block;font-size:7.5pt;text-transform:uppercase;color:#444;letter-spacing:.6px}
-  .rotulo .campo span{font-size:15pt;font-weight:700;line-height:1.2;word-break:break-word}
-  .rotulo .campo span.cel{font-size:17pt}
-  .rotulo .campo ul{margin:0;padding-left:5mm;font-size:11pt;font-weight:600;line-height:1.3}
-  .rotulo .campo ul.chico{font-size:8.5pt;line-height:1.2}
+  .rotulo{border:1px dashed #888;padding:3mm 4mm;box-sizing:border-box;min-height:0;min-width:0;page-break-inside:avoid;break-inside:avoid;color:#000;font-family:Arial,Helvetica,sans-serif;overflow:hidden;display:flex;flex-direction:column;gap:1mm}
+  .rotulo .marca{font-size:7pt;font-weight:700;letter-spacing:.5px;border-bottom:1px solid #000;padding-bottom:1mm}
+  .rotulo .campo small{display:block;font-size:5.5pt;text-transform:uppercase;color:#444;letter-spacing:.6px}
+  .rotulo .campo span{font-size:9pt;font-weight:700;line-height:1.15;word-break:break-word}
+  .rotulo .campo span.cel{font-size:10pt}
+  .rotulo .campo ul{margin:0;padding-left:4mm;font-size:7.5pt;font-weight:600;line-height:1.15}
+  .rotulo .campo ul.chico{font-size:6.5pt;line-height:1.1}
+  .rotulo .fila2{display:flex;gap:3mm}.rotulo .fila2>.campo{flex:1;min-width:0}
 }
 </style>
 </head>
@@ -290,9 +295,9 @@ button,a,label,select,input,textarea,.tab,.ficha{touch-action:manipulation}
       <div id="pendientes"></div>
       <div id="env-aviso"></div>
       <div class="fichas" id="env-fichas" role="tablist" aria-label="Filtrar por estado"></div>
-      <input type="search" class="search" id="env-q" placeholder="Buscar cliente, producto, celular o guía..." oninput="pintarEnvios()" style="margin-bottom:10px"/>
+      <input type="search" class="search" id="env-q" placeholder="Buscar cliente, producto, celular o guía..." oninput="envBuscar()" style="margin-bottom:10px"/>
       <div class="hdr hdr-fila">
-        <span class="t" id="env-n">Envíos</span>
+        <span class="t" id="env-n">Envíos <span class="env-sync" id="env-sync" aria-live="polite"></span></span>
         <select class="sel" id="env-orden" style="width:auto" onchange="pintarEnvios()" aria-label="Orden de los pedidos">
           <option value="NUEVOS" selected>Más recientes primero</option><option value="VENCE">Por vencer primero</option>
         </select>
@@ -514,23 +519,30 @@ async function entrar(){
   if(!u||!p){ $('lerr').textContent='Escribe usuario y contraseña'; return; }
   $('lerr').textContent='Verificando...';
   U=u; P=p;
+  // Usuario y clave viajan en cada petición, así que «login» y «envios» salen a la vez (2026-11-11: antes Envíos
+  // esperaba 1 a 2 s a que Google contestara el login). Si «envios» llega «No autorizado», se repite tras el login.
+  const login=post({action:'login'});
+  const env=cargarEnvios({login});
   try{
-    const r=await post({action:'login'});
+    const r=await login;
     if(r.error){ $('lerr').textContent=r.error; U=P=''; return; }
     $('login').style.display='none'; $('app').style.display='block';
     pachoHasta=r.pachoHasta||pachoHasta; ROL=r.rol||'jp';
     // El operador (Andreu, 2026-10-30) no ve costos, pagos a Pacho, deuda ni el resumen; el servidor igual se lo frena.
     document.querySelectorAll('.solo-jp').forEach(b=>{ b.hidden=ROL!=='jp'; });
     $('tab-pacho').hidden=ROL!=='jp'||r.pachoVisible===false;   // desde noviembre Pacho tiene sueldo: la pestaña se va al quedar en $0
-    cargarEnvios(); if(ROL==='jp') avisoCostos();
+    pintarPendientes();
+    // Cuántos pedidos sin costo ya lo trae «envios» (faltanCostos); con un servidor viejo se pide «costos» como antes.
+    await env;
+    if(ROL==='jp'){ if(typeof envFaltan==='number') pintarPendientes(); else avisoCostos(); }
   }catch(e){ $('lerr').textContent='No se pudo entrar: '+errTxt(e); U=P=''; }
 }
-function salir(){ U=P=''; $('app').style.display='none'; $('login').style.display='flex'; $('p').value=''; }
+function salir(){ U=P=''; envios=[]; envCargadoEl=0; envFaltan=undefined; $('app').style.display='none'; $('login').style.display='flex'; $('p').value=''; }
 
 let pgActual='envios';
 async function actualizarActual(){
   const b=$('b-act'); b.disabled=true; b.style.opacity='.5';
-  const f={envios:cargarEnvios,pedir:cargarPedir,rotulos:cargarRotulos,costos:cargarCostos,pacho:cargarPacho,deuda:cargarDeuda,ventas:cargarVentas}[pgActual];
+  const f={envios:()=>cargarEnvios({forzar:true}),pedir:cargarPedir,rotulos:cargarRotulos,costos:cargarCostos,pacho:cargarPacho,deuda:cargarDeuda,ventas:cargarVentas}[pgActual];
   try{ await f(); toast('Actualizado'); }catch(e){ toast('No se pudo actualizar','err'); }
   b.disabled=false; b.style.opacity='';
 }
@@ -559,11 +571,12 @@ const PK='vs-jp-pendientes';
 function pendLeer(){ try{ return JSON.parse(localStorage.getItem(PK)||'{}'); }catch(e){ return {}; } }
 function pendGuardar(o){ try{ localStorage.setItem(PK,JSON.stringify(o)); }catch(e){} }
 function pendOcultar(k,modo,n){ const o=pendLeer(); o[k]={modo,n:n||0,dia:hoy()}; pendGuardar(o); pintarPendientes(); }
-let faltanCosto=0, ventaCero=0, ROL='jp';
+let faltanCosto=0, ventaCero=0, ROL='jp', envFaltan;   // envFaltan: lo que «envios» trajo como faltanCostos (undefined con servidor viejo)
 function pintarPendientes(){
   const o=pendLeer();
+  if(ROL==='jp'&&typeof envFaltan==='number') faltanCosto=envFaltan;
   const items=[
-    {k:'costos',n:faltanCosto,txt:`<b>${faltanCosto} pedido${faltanCosto===1?'':'s'} sin costo cargado.</b> Mientras falte la inversión y el envío, ese dinero no sube en tu saldo.`,go:'Cargar costos',fn:"ir('costos',$('tab-costos'));window.scrollTo(0,0)"},
+    {k:'costos',n:ROL==='jp'?faltanCosto:0,txt:`<b>${faltanCosto} pedido${faltanCosto===1?'':'s'} sin costo cargado.</b> Mientras falte la inversión y el envío, ese dinero no sube en tu saldo.`,go:'Cargar costos',fn:"ir('costos',$('tab-costos'));window.scrollTo(0,0)"},
     {k:'prueba-imp',n:1,fijo:true,txt:'<b>Prueba la impresión una vez con papel real:</b> 1 rótulo y luego 4. Mira que el borde punteado salga completo y que nada se corte.'}
   ].filter(i=>{
     if(!i.n) return false;
@@ -591,55 +604,88 @@ const EST_ENV=[['POR REVISAR','Revisar bodega'],['POR PEDIR','Por pedir a Pacho'
 const EST_TXT=Object.fromEntries(EST_ENV);
 const SHOP_TXT={UNFULFILLED:'sin preparar',OPEN:'sin preparar',IN_PROGRESS:'en preparación',FULFILLED:'enviado',PARTIALLY_FULFILLED:'enviado en parte',ON_HOLD:'en espera',SCHEDULED:'programado',PENDING_FULFILLMENT:'pendiente'};
 let envios=[], envF='ABIERTOS', envForm=null, envBusy=false, envTrans=['Interrapidísimo'];
+let envCargadoEl=0, envDias='', envAvisoShop='', envVer=50, envQT=0;   // envVer: tarjetas pintadas (Entregados trae 200+; se pintan de a 50)
+const ENV_FRESCO=60000;   // 60 s (2026-11-11): cambiar de pestaña no vuelve a pedir si los datos son más nuevos que esto; «Actualizar» sí
 
-async function cargarEnvios(){
-  $('env-lista').innerHTML='<div class="loading">Cargando...</div>';
+// Caché en este aparato (2026-11-11): la última respuesta de «envios», por usuario. Al abrir se pinta al instante con
+// «actualizando…» y se reemplaza cuando Google contesta (1 a 2 s). Se guarda también tras cada cambio de estado.
+const envCK=()=>'vs-jp-envios:'+U;
+function envCacheLeer(){ try{ const c=JSON.parse(localStorage.getItem(envCK())||'null'); return c&&c.r&&Array.isArray(c.r.pedidos)?c.r:null; }catch(e){ return null; } }
+function envCacheGuardar(){ try{ localStorage.setItem(envCK(),JSON.stringify({t:Date.now(),r:{pedidos:envios,transportadoras:envTrans,avisoShopify:envAvisoShop,faltanCostos:envFaltan}})); }catch(e){} }
+function envRecibir(r){
+  envios=r.pedidos||[]; envTrans=r.transportadoras||envTrans; envAvisoShop=r.avisoShopify||'';
+  if(typeof r.faltanCostos==='number') envFaltan=r.faltanCostos;
+  $('env-aviso').innerHTML=envAvisoShop?`<div class="aviso"><b>No pude ver Shopify:</b> ${esc(envAvisoShop)} Igual puedes marcar los estados; lo de la página se le pasa a Shopify cuando vuelva.</div>`:'';
+  pintarEnvios();
+}
+function envSync(t){ $('env-sync').textContent=t||''; }
+
+// opts.forzar: botón Actualizar. opts.login: promesa del login cuando salen a la vez al entrar (se repite si llega «No autorizado»).
+async function cargarEnvios(opts){
+  opts=opts||{};
+  const dias=$('env-dias').value;
+  if(!opts.forzar&&envios.length&&envDias===dias&&Date.now()-envCargadoEl<ENV_FRESCO){ pintarEnvios(); return null; }
+  if(!envios.length){ const c=envCacheLeer(); if(c) envRecibir(c); }
+  if(envios.length) envSync('actualizando…'); else $('env-lista').innerHTML='<div class="loading">Cargando...</div>';
   try{
-    const r=await get({action:'envios',dias:$('env-dias').value});
-    if(r.error){ $('env-lista').innerHTML=`<div class="vacio">${esc(r.error)}</div>`; return; }
-    envios=r.pedidos||[]; envTrans=r.transportadoras||envTrans;
-    $('env-aviso').innerHTML=r.avisoShopify?`<div class="aviso"><b>No pude ver Shopify:</b> ${esc(r.avisoShopify)} Igual puedes marcar los estados; lo de la página se le pasa a Shopify cuando vuelva.</div>`:'';
-    pintarEnvios();
-  }catch(e){ $('env-lista').innerHTML='<div class="vacio">Error de conexión</div>'; }
+    let r=await get({action:'envios',dias});
+    if(r.error&&opts.login&&/autoriz/i.test(r.error)){ const l=await opts.login; if(!l.error) r=await get({action:'envios',dias}); }
+    if(r.error){ envSync(''); if(envios.length) toast('No se pudo actualizar: '+r.error,'err'); else $('env-lista').innerHTML=`<div class="vacio">${esc(r.error)}</div>`; return null; }
+    envCargadoEl=Date.now(); envDias=dias; envSync('');
+    envRecibir(r); envCacheGuardar();
+    if(typeof envFaltan==='number') pintarPendientes();
+    return r;
+  }catch(e){ envSync(''); if(envios.length) toast('No se pudo actualizar: '+errTxt(e),'err'); else $('env-lista').innerHTML='<div class="vacio">Error de conexión</div>'; return null; }
 }
 
 // Abiertos (por defecto): todo lo que Juan Pablo aún mueve. Despachado y Entregado solo con su ficha (Andreu, 2026-10-28).
+// «Revisar o despachar» (antes «Por hacer»; Andreu, 2026-11-11: no se entendía) junta Revisar bodega y Listo para despachar.
 const envGrupo={ABIERTOS:['POR REVISAR','POR PEDIR','EN CHINA','EN CAMINO','POR DESPACHAR','PAUSADO'],HACER:['POR REVISAR','POR DESPACHAR'],PAUSADO:['PAUSADO'],'POR PEDIR':['POR PEDIR'],'EN CHINA':['EN CHINA'],'EN CAMINO':['EN CAMINO'],DESPACHADO:['DESPACHADO'],ENTREGADO:['ENTREGADO']};
+const envNombre={ABIERTOS:'Abiertos',HACER:'Revisar o despachar','POR PEDIR':'Por pedir a Pacho','EN CHINA':'Pedido a China','EN CAMINO':'Viene para Colombia',PAUSADO:'Pausados',DESPACHADO:'Despachados',ENTREGADO:'Entregados'};
+const envDe={}; Object.entries(envGrupo).forEach(([k,l])=>l.forEach(e=>(envDe[e]=envDe[e]||[]).push(k)));   // estado → fichas donde cuenta
 // Orden (Andreu, 2026-11-10): por defecto lo recién vendido arriba, para que no se pida tarde; «Por vencer» pone
 // arriba la fecha prometida al cliente más cercana (sin fecha, al final).
 function ordenar(l,modo){
   const nuevos=(a,b)=>(b.fecha||'').localeCompare(a.fecha||'')||(Number(b.id)||0)-(Number(a.id)||0)||(a.idx||0)-(b.idx||0);
   return l.slice().sort(modo==='VENCE'?(a,b)=>(a.limite||'9999').localeCompare(b.limite||'9999')||-nuevos(a,b):nuevos);
 }
-function envFiltro(v){ envF=v; envForm=null; pintarEnvios(); }
+function envFiltro(v){ envF=v; envForm=null; envVer=50; pintarEnvios(); }
+// Escribir en el buscador espera 150 ms (2026-11-11): antes pintaba todas las tarjetas con cada letra.
+function envBuscar(){ clearTimeout(envQT); envVer=50; envQT=setTimeout(pintarEnvios,150); }
 
 function pintarEnvios(){
-  const n=k=>envios.filter(x=>envGrupo[k].includes(x.estado)).length;
-  const chip=(v,t)=>`<button class="ficha ${envF===v?'on':''}" role="tab" aria-selected="${envF===v}" onclick="envFiltro('${v}')">${t} <b>${n(v)}</b></button>`;
-  $('env-fichas').innerHTML=chip('ABIERTOS','Abiertos')+chip('HACER','Por hacer')+chip('POR PEDIR','Por pedir a Pacho')+chip('EN CHINA','Pedido a China')+chip('EN CAMINO','Viene para Colombia')+chip('PAUSADO','Pausados')+chip('DESPACHADO','Despachados')+chip('ENTREGADO','Entregados');
+  const cnt={}; Object.keys(envGrupo).forEach(k=>cnt[k]=0);
+  const pos=new Map();   // índice en «envios» de cada tarjeta (los botones llaman envios[i])
+  envios.forEach((x,i)=>{ pos.set(x,i); (envDe[x.estado]||[]).forEach(k=>cnt[k]++); });
+  const chip=v=>`<button class="ficha ${envF===v?'on':''}" role="tab" aria-selected="${envF===v}" onclick="envFiltro('${v}')">${envNombre[v]} <b>${cnt[v]}</b></button>`;
+  $('env-fichas').innerHTML=Object.keys(envNombre).map(chip).join('');
   const q=($('env-q').value||'').toLowerCase().trim();
   let l=q?envios:envios.filter(x=>envGrupo[envF].includes(x.estado));   // la búsqueda mira todos los estados
   if(q) l=l.filter(x=>[x.persona,x.producto,x.numero,x.guia,x.id,x.shopify&&x.shopify.pedido].some(v=>String(v||'').toLowerCase().includes(q)));
   l=ordenar(l,$('env-orden').value);
-  $('env-n').textContent=(q?'Resultados':{ABIERTOS:'Abiertos',HACER:'Por hacer','POR PEDIR':'Por pedir a Pacho','EN CHINA':'Pedido a China','EN CAMINO':'Viene para Colombia',PAUSADO:'Pausados',DESPACHADO:'Despachados',ENTREGADO:'Entregados'}[envF])+` (${l.length})`;
+  $('env-n').firstChild.textContent=(q?'Resultados':envNombre[envF])+` (${l.length}) `;
   if(!l.length){ $('env-lista').innerHTML=`<div class="vacio"><div class="big">✅</div><div>${q?'Ningún pedido coincide.':'No hay pedidos aquí.'}</div></div>`; return; }
-  $('env-lista').innerHTML=l.map(envTarjeta).join('');
+  const mas=l.length>envVer?`<button class="btn-fs env-mas" onclick="envVer+=50;pintarEnvios()">Ver más (quedan ${l.length-envVer})</button>`:'';
+  $('env-lista').innerHTML=l.slice(0,envVer).map(x=>envTarjeta(x,pos.get(x))).join('')+mas;
 }
 
 // Fecha que se le prometió al cliente (Andreu, 2026-10-29): la calcula el servidor (fechaLimite: importación 25 días,
 // bodega 4 hábiles). Rojo si ya pasó, amarillo si faltan 3 días o menos. Despachado o entregado ya no corre.
+// Dice de dónde sale (2026-11-11): «prometido» al cliente; en Revisar bodega la fecha viene de la regla de la página
+// hasta que Juan Pablo marque bodega o importación, y el chip lo dice.
 function plazoChip(limite,estado){
   if(!limite||['DESPACHADO','ENTREGADO'].includes(estado)) return '';
   const n=Math.round((new Date(limite+'T12:00:00')-new Date(hoy()+'T12:00:00'))/864e5);
   const cls=n<0?'chip-err':n<=3?'chip-pend':'chip-ok';
   const cuanto=n<0?`atrasado ${-n} día${n===-1?'':'s'}`:n===0?'es hoy':`faltan ${n} día${n===1?'':'s'}`;
-  return `<span class="chip ${cls}">Llega al cliente a más tardar el ${fFecha(limite)} · ${cuanto}</span>`;
+  const porque=estado==='POR REVISAR'?'Si la página acertó, llega':'Prometido: llega';
+  return `<span class="chip ${cls}">${porque} al cliente a más tardar el ${fFecha(limite)} · ${cuanto}</span>`;
 }
 
 function envClase(e){ return ['POR PEDIR','EN CHINA','EN CAMINO','PAUSADO'].includes(e)?'env-espera':e==='POR DESPACHAR'||e==='POR REVISAR'?'env-hacer':'env-ok'; }
 
-function envTarjeta(x){
-  const i=envios.indexOf(x), s=x.shopify;
+function envTarjeta(x,i){
+  const s=x.shopify;
   const chips=`<span class="chip ${x.canal==='SHOPIFY'?'chip-shop':'chip-ok'}">${x.canal==='SHOPIFY'?'Página':'WhatsApp'}</span>`
     +(x.importacion?`<span class="chip chip-pacho">${x.estado==='POR PEDIR'?'importación: toca pedirla a Pacho':'importación'}</span>`
       :(x.prendas||[]).length&&(x.prendas||[]).every(p=>p.origen==='B')?'<span class="chip chip-ok">en bodega</span>':'')
@@ -705,8 +751,14 @@ async function envOrigen(i,origen){
       const s=r.shopify||{};   // todo en bodega: Shopify queda «Preparado» (sin correo)
       if(s.aplica){ x.shopifyAviso=s.ok===false?s.mensaje:''; if(s.pedido) x.shopifyPedido=s.pedido; if(s.ok&&x.shopify) x.shopify.estado='FULFILLED'; }
       if(r.estado!=='POR REVISAR') envOrigenAbierto=null;
-      if(r.estado!==antes) toast(r.estado==='POR PEDIR'?'Pasa a «Pedir a Pacho» ✓':r.estado==='POR DESPACHAR'?'Todo en bodega: «Listo para despachar» y en Shopify «Preparado» ✓':'Guardado ✓');
-      else toast('Guardado ✓');
+      // Alguna de importación: el servidor manda el WhatsApp «en proceso de importación» y lo devuelve como envio_avisar.
+      const w=r.whatsapp||{};
+      if(w.aplica) x.wa=envWaDe(r.estado,w);
+      const partes=[r.estado!==antes?(r.estado==='POR PEDIR'?'Pasa a «Pedir a Pacho» ✓':r.estado==='POR DESPACHAR'?'Todo en bodega: «Listo para despachar» y en Shopify «Preparado» ✓':'Guardado ✓'):'Guardado ✓'];
+      if(w.aplica) partes.push(w.enviado?'WhatsApp enviado al cliente':'El WhatsApp no salió: míralo en la tarjeta');
+      toast(partes.join(' · '),w.aplica&&!w.enviado?'err':'ok');
+      if(w.enviado) envRevisarWa(x.id);
+      envCacheGuardar();
     }
   }catch(e){ toast('No se pudo guardar: '+errTxt(e),'err'); }
   envBusy=false; pintarEnvios();
@@ -762,7 +814,7 @@ async function envGuardar(i,estado,extra){
     const r=await post({action:'envio_estado',id:x.id,estado,fase:'guardar',...(extra||{})});
     if(r.error){ toast(r.error,'err'); envBusy=false; pintarEnvios(); return; }
     Object.assign(x,{estado:r.estado,guia:r.guia||'',transportadora:r.transportadora||'',tieneFoto:r.tieneFoto});
-    envForm=null;
+    envForm=null; envCacheGuardar();
     if(r.pendiente){
       toast(`${EST_TXT[estado]} ✓ guardado. Avisando a Shopify y al cliente...`);
       envBusy=false; pintarEnvios();
@@ -792,14 +844,17 @@ function envAplicar(x,estado,r){
   if(s.aplica&&s.ok&&x.shopify){ x.shopify.estado={'EN CHINA':'FULFILLED','EN CAMINO':'FULFILLED',PAUSADO:'ON_HOLD',DESPACHADO:'FULFILLED',ENTREGADO:'FULFILLED'}[estado]||x.shopify.estado; }
   if(r.shopifyPedido) x.shopifyPedido=r.shopifyPedido;
   const w=r.whatsapp||{};
-  if(w.aplica) x.wa={estado:w.enviado?estado:'',id:w.id||'',aviso:w.enviado?'':w.mensaje,el:'ahora',sinCelular:!!w.sinCelular,sinWhatsApp:!!w.sinWhatsApp};
+  if(w.aplica) x.wa=envWaDe(estado,w);
   envForm=null;
   const partes=[`${EST_TXT[estado]} ✓`];
   if(w.aplica) partes.push(w.enviado?'WhatsApp enviado al cliente':'El WhatsApp no salió: míralo en la tarjeta');
   if(s.aplica) partes.push(s.ok?s.mensaje:`Shopify no se enteró: ${s.mensaje}`);
   toast(partes.join(' · '), (s.aplica&&s.ok===false)||(w.aplica&&!w.enviado)?'err':'ok');
   if(w.enviado) envRevisarWa(x.id);
+  envCacheGuardar();
 }
+// Lo que la tarjeta guarda del WhatsApp que el servidor acaba de mandar (misma forma en envio_avisar y envio_origen).
+const envWaDe=(estado,w)=>({estado:w.enviado?estado:'',id:w.id||'',aviso:w.enviado?'':w.mensaje,el:'ahora',sinCelular:!!w.sinCelular,sinWhatsApp:!!w.sinWhatsApp});
 
 // La foto se achica en el celular antes de subir (lado largo de 1.600 px): sube rápido y se lee igual.
 function envComprimir(file){
@@ -849,7 +904,7 @@ function envWa(x,i){
     const reintentar=!w.fallo&&!w.sinWhatsApp&&!w.sinCelular?`<div style="margin-top:8px"><button class="btn-fs" onclick="envGuardar(${i},'${x.estado}')">Reintentar WhatsApp</button></div>`:'';
     return `<div class="aviso" style="margin:0;border-color:rgba(248,113,113,.45);color:#fca5a5"><b>El WhatsApp no le llegó.</b> ${esc(motivo)} ${llamar}${reintentar}</div>`;
   }
-  return `<div class="pmeta" style="color:#4ade80">WhatsApp «${esc(EST_TXT[w.estado]||w.estado)}» enviado${w.el&&w.el!=='ahora'?' '+esc(w.el):''} ✓</div>`;
+  return `<div class="pmeta" style="color:#4ade80">WhatsApp «${esc(w.estado==='POR PEDIR'?'en proceso de importación':EST_TXT[w.estado]||w.estado)}» enviado${w.el&&w.el!=='ahora'?' '+esc(w.el):''} ✓</div>`;
 }
 
 // Meta avisa unos segundos después si el número no tiene WhatsApp: se pregunta dos veces.
@@ -912,7 +967,7 @@ function rotFila(x){
     <div class="rb">
       <b>${x.persona?esc(x.persona):rojo('SIN NOMBRE')}</b> <span class="prod">#${esc(x.id)}</span>${chips}<br>
       CC ${x.cedula?esc(x.cedula):rojo('falta')} · Cel ${x.numero?esc(x.numero):rojo('falta')}<br>
-      ${rotLugar(x)?esc(rotLugar(x)):rojo('falta ciudad / departamento')}
+      ${x.direccion?esc(x.direccion):rojo('falta dirección')} · ${rotLugar(x)?esc(rotLugar(x)):rojo('falta ciudad / departamento')}
       <div class="prod">${x.producto?esc(rotItems(x.producto).join(' · ')):rojo('sin producto')}</div>
     </div></label>`;
 }
@@ -945,9 +1000,9 @@ function rotVerDespachados(){ rotVerDesp=!rotVerDesp;
   if(!rotVerDesp) rotulos.forEach(x=>{ if(ROT_SALIO.includes(x.estado)) rotSel.delete(x.id); }); $('b-rot-desp').textContent=rotVerDesp?'Ocultar despachados':'Ver despachados'; pintarRotulos(); }
 function rotResumen(){
   const n=rotSel.size;
-  const vac=(4-n%4)%4;
+  const vac=(8-n%8)%8;
   const q=rotQ(), ocultos=q?rotulos.filter(x=>rotSel.has(x.id)&&!rotCoincide(x,q)).length:0;
-  $('rot-resumen').innerHTML=n?`${n} marcado(s)`+(ocultos?` <b style="color:var(--amber)">(${ocultos} fuera de la búsqueda)</b>`:'')+` · ${Math.ceil(n/4)} hoja(s) carta`+(vac?` · <b style="color:var(--amber)">la última hoja queda con ${vac} espacio(s) vacío(s)</b>`:' · hojas completas ✓'):'Marca los pedidos con los que vas a trabajar';
+  $('rot-resumen').innerHTML=n?`${n} marcado(s)`+(ocultos?` <b style="color:var(--amber)">(${ocultos} fuera de la búsqueda)</b>`:'')+` · ${Math.ceil(n/8)} hoja(s) carta`+(vac?` · <b style="color:var(--amber)">la última hoja queda con ${vac} espacio(s) vacío(s)</b>`:' · hojas completas ✓'):'Marca los pedidos con los que vas a trabajar';
   $('rot-btn').disabled=!n;
 }
 
@@ -984,16 +1039,17 @@ function rotulosHTML(lista){
     return `<div class="rotulo">
       <div class="marca">VELOCITY SAVAGE · #${esc(x.id)}</div>
       <div class="campo"><small>Nombre</small><span>${esc(x.persona)}</span></div>
-      <div class="campo"><small>Cédula</small><span>${esc(x.cedula)}</span></div>
-      <div class="campo"><small>Celular</small><span class="cel">${esc(x.numero)}</span></div>
+      <div class="fila2"><div class="campo"><small>Cédula</small><span>${esc(x.cedula)}</span></div>
+      <div class="campo"><small>Celular</small><span class="cel">${esc(x.numero)}</span></div></div>
+      <div class="campo"><small>Dirección</small><span>${esc(x.direccion||'')}</span></div>
       <div class="campo"><small>Ciudad — Departamento</small><span>${esc(rotLugar(x))}</span></div>
       <div class="campo"><small>Producto</small><ul class="${it.length>3?'chico':''}">${it.map(p=>`<li>${esc(p)}</li>`).join('')}</ul></div>
     </div>`;
   };
   let h='';
-  for(let i=0;i<lista.length;i+=4){
-    const g=lista.slice(i,i+4).map(rot);
-    while(g.length<4) g.push('<div></div>');
+  for(let i=0;i<lista.length;i+=8){
+    const g=lista.slice(i,i+8).map(rot);
+    while(g.length<8) g.push('<div></div>');
     h+=`<div class="hoja">${g.join('')}</div>`;
   }
   return h;
