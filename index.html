@@ -318,6 +318,7 @@ button,a,label,select,input,textarea,.tab,.ficha{touch-action:manipulation}
       <p class="pista"><b>Aquí armas el pedido a Pacho.</b> Salen las prendas que marcaste «Importación» en Envíos y todavía no le pides. Elige, revisa talla y dorsal, y manda el PDF</p>
       <div id="ped-aviso"></div>
       <div id="ped-listo"></div>
+      <div id="ped-ultimo"></div>
       <input type="search" class="search" id="ped-q" placeholder="Buscar cliente o camiseta..." oninput="pintarPedir()" style="margin-bottom:10px"/>
       <div class="hdr hdr-fila">
         <span class="t" id="ped-n">Por pedir</span>
@@ -497,13 +498,15 @@ async function get(params){ return post(params); }
 // Google tarda 1 a 2 s en contestar aunque no haga nada (medido el 2026-10-30) y a veces devuelve una página de error
 // en vez de datos: antes eso salía como falta de internet aunque hubiera internet. Ahora se reintenta solo y, si
 // igual falla, dice qué pasó. Lo que suma cada vez que se repite (impresiones, foto) no se reintenta.
-const SIN_REINTENTO={rot_impreso:1,envio_foto:1};
+// El PDF a Pacho no se repite y espera hasta 5 min (2026-11-12: con muchas prendas pasaba de 35 s, se cortaba y el
+// reintento chocaba con el primero, que seguía armándolo).
+const SIN_REINTENTO={rot_impreso:1,envio_foto:1,pacho_pedir:1,pacho_deshacer:1}, ESPERA={pacho_pedir:300000,pacho_ultimo:90000};
 async function post(body){
   const intentos=SIN_REINTENTO[body.action]?1:3;
   let ultimo;
   for(let k=0;k<intentos;k++){
     if(k) await new Promise(r=>setTimeout(r,800*k));
-    const ctl=new AbortController(), t=setTimeout(()=>ctl.abort(),35000);
+    const ctl=new AbortController(), t=setTimeout(()=>ctl.abort(),ESPERA[body.action]||35000);
     try{
       const r=await fetch(API,{method:'POST',body:JSON.stringify({...body,u:U,p:P}),
         headers:{'Content-Type':'text/plain'},redirect:'follow',signal:ctl.signal});
@@ -678,15 +681,13 @@ function pintarEnvios(){
 
 // Fecha que se le prometió al cliente (Andreu, 2026-10-29): la calcula el servidor (fechaLimite: importación 25 días,
 // bodega 4 hábiles). Rojo si ya pasó, amarillo si faltan 3 días o menos. Despachado o entregado ya no corre.
-// Dice de dónde sale (2026-11-11): «prometido» al cliente; en Revisar bodega la fecha viene de la regla de la página
-// hasta que Juan Pablo marque bodega o importación, y el chip lo dice.
+// Andreu (2026-11-12): solo cuándo debe llegar y cuántos días faltan («Si la página acertó» no se entendía).
 function plazoChip(limite,estado){
   if(!limite||['DESPACHADO','ENTREGADO'].includes(estado)) return '';
   const n=Math.round((new Date(limite+'T12:00:00')-new Date(hoy()+'T12:00:00'))/864e5);
   const cls=n<0?'chip-err':n<=3?'chip-pend':'chip-ok';
   const cuanto=n<0?`atrasado ${-n} día${n===-1?'':'s'}`:n===0?'es hoy':`faltan ${n} día${n===1?'':'s'}`;
-  const porque=estado==='POR REVISAR'?'Si la página acertó, llega':'Prometido: llega';
-  return `<span class="chip ${cls}">${porque} al cliente a más tardar el ${fFecha(limite)} · ${cuanto}</span>`;
+  return `<span class="chip ${cls}">Debe llegar máximo el ${fFecha(limite)} · ${cuanto}</span>`;
 }
 
 function envClase(e){ return ['POR PEDIR','EN CHINA','EN CAMINO','PAUSADO'].includes(e)?'env-espera':e==='POR DESPACHAR'||e==='POR REVISAR'?'env-hacer':'env-ok'; }
@@ -1247,6 +1248,32 @@ async function cargarPedir(){
     $('ped-aviso').innerHTML=r.avisoFotos?`<div class="aviso">No pude traer las fotos de Shopify: ${esc(r.avisoFotos)} El PDF sale sin foto.</div>`:'';
     pintarPedir();
   }catch(e){ $('ped-lista').innerHTML='<div class="vacio">Error de conexión</div>'; }
+  pedUltimo();
+}
+// El último lote (2026-11-12): si se quitó de la lista por error, se devuelve; si tuvo PDF, se baja otra vez.
+let pedLote=null;
+async function pedUltimo(){
+  try{ const r=await get({action:'pacho_ultimo'}); pedLote=r&&r.lote; }catch(e){ pedLote=null; }
+  const u=pedLote, cuando=u?new Date(u.el).toLocaleString('es-CO',{day:'numeric',month:'short',hour:'numeric',minute:'2-digit'}):'';
+  $('ped-ultimo').innerHTML=!u?'':u.pdf
+    ?`<div class="aviso"><b>Último PDF a Pacho:</b> ${cuando} · ${u.pedidos} pedido${u.pedidos===1?'':'s'}. <button class="btn-fs" onclick="pedLoteBajar()">Bajar ese PDF otra vez</button></div>`
+    :u.sueltas?`<div class="aviso"><b>Quitaste ${u.sueltas} prenda${u.sueltas===1?'':'s'} con «Ya se las había pedido»</b> (${cuando}). ¿Fue un error? <button class="btn-fs" onclick="pedDeshacer()">Devolverlas a la lista</button></div>`:'';
+}
+async function pedLoteBajar(){
+  toast('Bajando el PDF...');
+  try{
+    const r=await get({action:'pacho_ultimo',bajar:true});
+    if(r.error) return toast(r.error,'err');
+    pedPdf={blob:new Blob([Uint8Array.from(atob(r.pdf),c=>c.charCodeAt(0))],{type:'application/pdf'}),nombre:r.nombre};
+    pedMandar();
+  }catch(e){ toast('No se pudo: '+errTxt(e),'err'); }
+}
+async function pedDeshacer(){
+  if(!pedLote||pedBusy||!confirm(`¿Devolver ${pedLote.sueltas} prenda${pedLote.sueltas===1?'':'s'} a «Por pedir»?\n\nVuelven a la lista para armar el PDF a Pacho.`)) return;
+  pedBusy=true; toast('Devolviendo...');
+  try{ const r=await post({action:'pacho_deshacer',el:pedLote.el}); toast(r.error||`Listo: ${r.prendas} de vuelta en la lista ✓`, r.error?'err':'ok'); }
+  catch(e){ toast('No se pudo: '+errTxt(e),'err'); }
+  pedBusy=false; await cargarPedir();
 }
 function pedVisibles(){
   const q=($('ped-q').value||'').toLowerCase().trim();
