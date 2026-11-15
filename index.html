@@ -161,6 +161,9 @@ main{padding:14px 16px 24px;max-width:1300px;margin:0 auto}
 .pedido.env-hacer{border-left:3px solid var(--amber)}
 .pedido.env-prep{border-left:3px solid var(--blue)}
 .pedido.env-ok{border-left:3px solid var(--green)}
+/* Para despachar (Juan Pablo, 2026-11-15): amarillo, distinto del naranja de «Mirar si hay en bodega»; con este estado se imprime el rótulo */
+.pedido.env-despachar{border-left:3px solid #facc15;border-color:rgba(250,204,21,.45)}
+.chip-despachar{background:rgba(250,204,21,.16);color:#fde047;border:1px solid rgba(250,204,21,.45)}
 .chip-shop{background:rgba(42,120,214,.12);color:#8ab8f0;border:1px solid rgba(42,120,214,.3)}
 .chip-err{background:rgba(248,113,113,.12);color:#f87171;border:1px solid rgba(248,113,113,.3)}
 .env-guia{font-size:13px;color:var(--text);margin-top:6px}
@@ -297,7 +300,7 @@ button,a,label,select,input,textarea,.tab,.ficha{touch-action:manipulation}
     </div>
 
     <div class="page active" id="pg-envios">
-      <p class="pista"><b>Aquí avanzas cada pedido hasta que le llega al cliente.</b> Cada venta nueva llega en «Mirar si hay en bodega»: busca cada prenda y márcala. Desde «Listo para despachar», cada cambio le avisa al cliente por WhatsApp</p>
+      <p class="pista"><b>Aquí avanzas cada pedido hasta que le llega al cliente.</b> Cada venta nueva llega en «Mirar si hay en bodega»: busca cada prenda y márcala. Desde «Para despachar», cada cambio le avisa al cliente por WhatsApp</p>
       <div id="pendientes"></div>
       <div id="env-aviso"></div>
       <div class="fichas" id="env-fichas" role="tablist" aria-label="Filtrar por estado"></div>
@@ -609,7 +612,7 @@ async function avisoCostos(){
 // y Shopify le manda el correo al cliente) y «entregado». «En China» y «Viene para Colombia» son internos.
 // Al cambiar el estado (salvo En China y Viene para Colombia) el servidor le manda al cliente la plantilla de WhatsApp
 // del estado. Si no sale o el número no tiene WhatsApp, la tarjeta dice a quién llamar o escribir.
-const EST_ENV=[['POR REVISAR','Mirar si hay en bodega'],['POR PEDIR','Por pedir a Pacho'],['EN CHINA','Pedido a China'],['EN CAMINO','Viene para Colombia'],['POR DESPACHAR','Listo para despachar'],['PAUSADO','Pausado'],['DESPACHADO','Despachado'],['ENTREGADO','Entregado']];
+const EST_ENV=[['POR REVISAR','Mirar si hay en bodega'],['POR PEDIR','Por pedir a Pacho'],['EN CHINA','Pedido a China'],['EN CAMINO','Viene para Colombia'],['POR DESPACHAR','Para despachar'],['PAUSADO','Pausado'],['DESPACHADO','Despachado'],['ENTREGADO','Entregado']];
 const EST_TXT=Object.fromEntries(EST_ENV);
 const SHOP_TXT={UNFULFILLED:'sin preparar',OPEN:'sin preparar',IN_PROGRESS:'en preparación',FULFILLED:'enviado',PARTIALLY_FULFILLED:'enviado en parte',ON_HOLD:'en espera',SCHEDULED:'programado',PENDING_FULFILLMENT:'pendiente'};
 let envios=[], envF='ABIERTOS', envForm=null, envBusy=false, envTrans=['Interrapidísimo'];
@@ -651,7 +654,7 @@ async function cargarEnvios(opts){
 // «Mirar si hay en bodega» y «Por despachar» van aparte y de segundas (Andreu, 2026-11-11: «todo debe ser para tontos»; antes iban
 // juntas como «Le toca a bodega» y no se entendía): lo que bodega mueve ya, sin esperar a nadie.
 const envGrupo={ABIERTOS:['POR REVISAR','POR PEDIR','EN CHINA','EN CAMINO','POR DESPACHAR','PAUSADO'],'POR REVISAR':['POR REVISAR'],'POR DESPACHAR':['POR DESPACHAR'],PAUSADO:['PAUSADO'],'POR PEDIR':['POR PEDIR'],'EN CHINA':['EN CHINA'],'EN CAMINO':['EN CAMINO'],DESPACHADO:['DESPACHADO'],ENTREGADO:['ENTREGADO']};
-const envNombre={ABIERTOS:'Todos pendientes','POR REVISAR':'Mirar si hay en bodega','POR DESPACHAR':'Por despachar','POR PEDIR':'Por pedir a Pacho','EN CHINA':'Pedido a China','EN CAMINO':'Viene para Colombia',PAUSADO:'Pausados',DESPACHADO:'Despachados',ENTREGADO:'Entregados'};
+const envNombre={ABIERTOS:'Todos pendientes','POR REVISAR':'Mirar si hay en bodega','POR DESPACHAR':'Para despachar','POR PEDIR':'Por pedir a Pacho','EN CHINA':'Pedido a China','EN CAMINO':'Viene para Colombia',PAUSADO:'Pausados',DESPACHADO:'Despachados',ENTREGADO:'Entregados'};
 const envDe={}; Object.entries(envGrupo).forEach(([k,l])=>l.forEach(e=>(envDe[e]=envDe[e]||[]).push(k)));   // estado → fichas donde cuenta
 // Orden (Andreu, 2026-11-10): por defecto lo recién vendido arriba, para que no se pida tarde; «Por vencer» pone
 // arriba la fecha prometida al cliente más cercana (sin fecha, al final).
@@ -690,7 +693,7 @@ function plazoChip(limite,estado){
   return `<span class="chip ${cls}">Debe llegar máximo el ${fFecha(limite)} · ${cuanto}</span>`;
 }
 
-function envClase(e){ return ['POR PEDIR','EN CHINA','EN CAMINO','PAUSADO'].includes(e)?'env-espera':e==='POR DESPACHAR'||e==='POR REVISAR'?'env-hacer':'env-ok'; }
+function envClase(e){ return ['POR PEDIR','EN CHINA','EN CAMINO','PAUSADO'].includes(e)?'env-espera':e==='POR DESPACHAR'?'env-despachar':e==='POR REVISAR'?'env-hacer':'env-ok'; }
 
 function envTarjeta(x,i){
   const s=x.shopify;
@@ -700,6 +703,7 @@ function envTarjeta(x,i){
     +(s?`<span class="chip chip-shop">Shopify ${esc(s.pedido)}${s.cancelado?': cancelado':s.estado?': '+esc(SHOP_TXT[s.estado]||s.estado.toLowerCase()):''}</span>`:'')
     +(x.canal==='SHOPIFY'&&!s&&!x.shopifyPedido?'<span class="chip chip-pend">sin unir a Shopify</span>':'')
     +(x.shopifyAviso?'<span class="chip chip-err">Shopify no se enteró</span>':'')
+    +(x.estado==='POR DESPACHAR'?'<span class="chip chip-despachar">Para despachar · imprime el rótulo</span>':'')
     +plazoChip(x.limite,x.estado);
   const guia=x.guia?`<div class="env-guia">Guía <b>${esc(x.guia)}</b> · ${esc(x.transportadora)}${x.despachadoEl?' · salió '+esc(x.despachadoEl):''}${x.entregadoEl?' · llegó '+esc(x.entregadoEl):''}</div>`:'';
   const privada=x.transportadora==='Privada'&&!x.guia&&x.despachadoEl?`<div class="env-guia">Transportadora privada · salió ${esc(x.despachadoEl)}${x.entregadoEl?' · llegó '+esc(x.entregadoEl):''}</div>`:'';
@@ -728,7 +732,7 @@ function envTarjeta(x,i){
 
 // Bodega o importación, prenda por prenda (Andreu, 2026-10-22): la regla de la página no siempre acierta.
 // Con todas marcadas el pedido se mueve solo: todo en bodega → Por preparar; alguna de importación → Pedir a Pacho.
-const EST_AUTO=['POR REVISAR','POR PEDIR','POR DESPACHAR','ENTREGADO'];   // Entregado lo pone el servidor a los 4 días de despachado
+const EST_AUTO=['POR REVISAR','POR PEDIR','ENTREGADO'];   // Entregado lo pone el servidor a los 4 días de despachado
 let envOrigenAbierto=null;
 function envOrigenBloque(x,i){
   const pr=x.prendas||[];
@@ -762,7 +766,7 @@ async function envOrigen(i,origen){
       // Alguna de importación: el servidor manda el WhatsApp «en proceso de importación» y lo devuelve como envio_avisar.
       const w=r.whatsapp||{};
       if(w.aplica) x.wa=envWaDe(r.estado,w);
-      const partes=[r.estado!==antes?(r.estado==='POR PEDIR'?'Pasa a «Pedir a Pacho» ✓':r.estado==='POR DESPACHAR'?'Todo en bodega: «Listo para despachar» y en Shopify «Preparado» ✓':'Guardado ✓'):'Guardado ✓'];
+      const partes=[r.estado!==antes?(r.estado==='POR PEDIR'?'Pasa a «Pedir a Pacho» ✓':r.estado==='POR DESPACHAR'?'Todo en bodega: «Para despachar» y en Shopify «Preparado» ✓':'Guardado ✓'):'Guardado ✓'];
       if(w.aplica) partes.push(w.enviado?'WhatsApp enviado al cliente':'El WhatsApp no salió: míralo en la tarjeta');
       toast(partes.join(' · '),w.aplica&&!w.enviado?'err':'ok');
       if(w.enviado) envRevisarWa(x.id);
@@ -968,6 +972,7 @@ function rotFila(x){
   const chips=(x.importacion?'<span class="chip chip-pacho">importación</span>':'')
     +(ROT_ESPERA.includes(x.estado)?`<span class="chip chip-pend">${{'POR REVISAR':'revisar bodega','POR PEDIR':'por pedir a Pacho','EN CHINA':'pedido a China'}[x.estado]||'viene para Colombia'}</span>`:'')
     +(x.estado==='PREPARANDO'?'<span class="chip chip-shop">preparando</span>':'')
+    +(x.estado==='POR DESPACHAR'?'<span class="chip chip-despachar">para despachar</span>':'')
     +(x.impresiones?`<span class="chip chip-ok">impreso ${x.impresiones}×${x.ultimaImpresion?' · '+esc(x.ultimaImpresion):''}</span>`:'')
     +(ROT_SALIO.includes(x.estado)?`<span class="chip chip-ok">${x.estado==='ENTREGADO'?'entregado':'despachado'}${x.despachadoEl?' '+esc(x.despachadoEl):''}</span>`:'');
   return `<label class="rot ${f.length?'falta':''}">
@@ -984,15 +989,15 @@ function pintarRotulos(){
   const por=rotulos.filter(x=>ROT_LISTO.includes(x.estado)), cam=rotulos.filter(x=>ROT_ESPERA.includes(x.estado)), des=rotulos.filter(x=>ROT_SALIO.includes(x.estado));
   const inc=por.filter(x=>rotFalta(x).length).length;
   $('c-rot').innerHTML=`
-    <div class="card"><div class="lbl">Por despachar</div><div class="val ${por.length?'amber':'green'}">${por.length}</div><div class="sub">Listos para rotular · se despachan en Envíos</div></div>
+    <div class="card"><div class="lbl">Para despachar</div><div class="val ${por.length?'amber':'green'}">${por.length}</div><div class="sub">Listos para rotular · se despachan en Envíos</div></div>
     <div class="card"><div class="lbl">Importación en camino</div><div class="val">${cam.length}</div><div class="sub">Se liberan al imprimir su rótulo</div></div>
     <div class="card"><div class="lbl">Datos incompletos</div><div class="val ${inc?'red':'green'}">${inc}</div><div class="sub">${inc?'No se pueden imprimir':'Todo completo'}</div></div>
     <div class="card"><div class="lbl">Despachados</div><div class="val green">${des.length}</div><div class="sub">En este período</div></div>`;
-  $('rot-n').textContent=`Rótulos (${por.length} por despachar)`;
+  $('rot-n').textContent=`Rótulos (${por.length} para despachar)`;
   $('rot-aviso').innerHTML=inc?`<div class="aviso"><b>${inc} pedido(s) con datos incompletos</b> (en rojo). Corrige el dato en el registro de Despachos y recarga: aquí no se inventa.</div>`:'';
   const q=rotQ(), f=l=>l.filter(x=>rotCoincide(x,q));
   const grupo=(t,l)=>l.length?`<div class="ct" style="margin:16px 0 8px">${t} (${l.length})</div>`+l.map(rotFila).join(''):'';
-  const html=grupo('Por despachar',f(por))+grupo('Importación en camino — cuando llegue, imprime su rótulo',f(cam))+(rotVerDesp?grupo('Despachados',f(des)):'');
+  const html=grupo('Para despachar',f(por))+grupo('Importación en camino — cuando llegue, imprime su rótulo',f(cam))+(rotVerDesp?grupo('Despachados',f(des)):'');
   $('rot-lista').innerHTML=html||(q?`<div class="vacio"><div>Nada coincide con «${esc($('rot-q').value.trim())}».</div></div>`:`<div class="vacio"><div class="big">✅</div><div>No hay pedidos en este período.</div></div>`);
   rotResumen();
 }
@@ -1027,7 +1032,7 @@ async function rotCambiar(estado){
   if(estado==='ENTREGADO'){
     pregunta=`¿Marcar ${ids.length} pedido(s) como ENTREGADOS?\n\nEs para cerrar pedidos que ya llegaron antes de la pestaña Envíos. No se le avisa nada al cliente ni a Shopify.`;
   }else{
-    pregunta=`¿Reabrir ${ids.length} pedido(s)? Vuelven a «Listo para despachar». En Shopify no se deshace nada.`;
+    pregunta=`¿Reabrir ${ids.length} pedido(s)? Vuelven a «Para despachar». En Shopify no se deshace nada.`;
   }
   if(!confirm(pregunta)) return;
   rotBusy=true;
@@ -1075,7 +1080,7 @@ function rotImprimir(){
   if(l.some(x=>rotFalta(x).length)){ toast('Hay rótulos con datos incompletos. Desmárcalos o corrígelos.','err'); return; }
   const vac=(8-l.length%8)%8;
   const cam=l.filter(x=>ROT_ESPERA.includes(x.estado)).length;
-  const aviso=`Vas a imprimir ${l.length} rótulo(s) en ${Math.ceil(l.length/8)} hoja(s) carta.`+(cam?`\n\n${cam} figura(n) todavía en camino: al confirmar que salieron bien quedan «Listo para despachar» y a cada cliente le llega el WhatsApp de que su pedido ya está en bodega.`:'')+(vac?`\n\nOJO: la última hoja saldrá con ${vac} espacio(s) vacío(s). ${l.length===1?'Si tienes más pedidos listos, márcalos para aprovechar la hoja.':'¿Seguro que no faltan pedidos por marcar?'}`:'')+`\n\nEn la ventana de impresión: tamaño Carta, escala 100% y márgenes «Ninguno».`;
+  const aviso=`Vas a imprimir ${l.length} rótulo(s) en ${Math.ceil(l.length/8)} hoja(s) carta.`+(cam?`\n\n${cam} figura(n) todavía en camino: al confirmar que salieron bien quedan «Para despachar» y a cada cliente le llega el WhatsApp de que su pedido ya está en bodega.`:'')+(vac?`\n\nOJO: la última hoja saldrá con ${vac} espacio(s) vacío(s). ${l.length===1?'Si tienes más pedidos listos, márcalos para aprovechar la hoja.':'¿Seguro que no faltan pedidos por marcar?'}`:'')+`\n\nEn la ventana de impresión: tamaño Carta, escala 100% y márgenes «Ninguno».`;
   if(!confirm(aviso)) return;
   const rep=l.filter(x=>x.impresiones>0);
   if(rep.length){
@@ -1103,12 +1108,12 @@ async function rotConfirmar(ok){
     const r=await post({action:'rot_impreso',ids:l.map(x=>x.id)});
     if(r.error) toast(r.error,'err'); else toast('Impresión registrada');
     // Imprimir el rótulo es la señal de que la importación llegó (no hay botón «Ya llegó» desde 2026-11-10):
-    // el servidor la deja «Listo para despachar» y le manda al cliente el WhatsApp de bodega.
+    // el servidor la deja «Para despachar» y le manda al cliente el WhatsApp de bodega.
     const cam=l.filter(x=>ROT_ESPERA.includes(x.estado));
     if(cam.length){
       const e=await post({action:'rot_estado',ids:cam.map(x=>x.id),estado:'POR DESPACHAR'});
-      if(e.error) toast('Impresos, pero no pude dejarlos «Listo para despachar»: '+e.error,'err');
-      else{ const w=e.whatsapp||{enviados:0,fallaron:[]}; toast(`${e.cambiados} pedido(s) listos para despachar`+(w.enviados?` · ${w.enviados} WhatsApp enviados`:'')+(w.fallaron.length?` · ${w.fallaron.length} sin WhatsApp: míralos en Envíos`:''), w.fallaron.length?'err':'ok'); }
+      if(e.error) toast('Impresos, pero no pude dejarlos «Para despachar»: '+e.error,'err');
+      else{ const w=e.whatsapp||{enviados:0,fallaron:[]}; toast(`${e.cambiados} pedido(s) para despachar`+(w.enviados?` · ${w.enviados} WhatsApp enviados`:'')+(w.fallaron.length?` · ${w.fallaron.length} sin WhatsApp: míralos en Envíos`:''), w.fallaron.length?'err':'ok'); }
     }
   }catch(e){ toast('No se pudo registrar la impresión: '+errTxt(e),'err'); }
   finally{ rotBusy=false; }
