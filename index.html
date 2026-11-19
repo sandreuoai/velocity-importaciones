@@ -1089,16 +1089,54 @@ function rotImprimir(){
   }
   $('hoja-impresion').innerHTML=rotulosHTML(l);
   document.body.classList.add('imprimiendo');
-  window.print();
+  // Diagnóstico (2026-11-19: Juan Pablo «no imprime» y no salía ningún error). Se escucha si el celular de verdad
+  // abrió la ventana de impresión (beforeprint o la vista «print»); si a los ROT_ESPERA_PRINT ms no la abrió, la
+  // pantalla lo dice con el arreglo según dónde está abierto el panel, y deja una línea de detalle para el pantallazo.
+  const diag={abrio:false,error:'',ent:rotEntorno()};
+  const marca=()=>{ diag.abrio=true; }, mq=window.matchMedia?matchMedia('print'):null, mqf=e=>{ if(e.matches) diag.abrio=true; };
+  window.addEventListener('beforeprint',marca);
+  if(mq&&mq.addEventListener) mq.addEventListener('change',mqf);
+  try{ window.print(); }catch(e){ diag.error=String(e&&e.message||e); }
   // La pregunta «¿salieron bien?» va en la pantalla y no en un aviso al cerrar la impresión: hay
   // celulares que no avisan cuándo se cerró (o avisan antes de imprimir). La hoja se queda armada
   // (solo se ve al imprimir), así que no importa cuándo llegue ese aviso.
-  rotPendiente=l; rotPintarConfirma();
+  rotPendiente=l; rotDiag=diag; rotPintarConfirma();
+  setTimeout(()=>{
+    window.removeEventListener('beforeprint',marca);
+    if(mq&&mq.removeEventListener) mq.removeEventListener('change',mqf);
+    diag.listo=true; if(rotDiag===diag) rotPintarConfirma();
+  },ROT_ESPERA_PRINT);
 }
-let rotPendiente=null;
+// 3 s: en computador print() bloquea y el aviso llega antes de volver; en iPhone la ventana sale en menos de 1 s.
+const ROT_ESPERA_PRINT=3000;
+let rotPendiente=null, rotDiag=null;
+// Dónde está abierto el panel: navegador, app (WhatsApp, Instagram…) o ícono de la pantalla de inicio.
+function rotEntorno(){
+  const ua=navigator.userAgent||'', ios=/iPhone|iPad|iPod/.test(ua)||(/Macintosh/.test(ua)&&navigator.maxTouchPoints>1);
+  const v=(ua.match(/OS (\d+)[_.](\d+)/)||[]).slice(1).join('.');
+  const app=/WhatsApp/i.test(ua)?'WhatsApp':/Instagram/i.test(ua)?'Instagram':/FBAN|FBAV|FB_IAB/i.test(ua)?'Facebook':/GSA\//.test(ua)?'la app de Google':/CriOS/.test(ua)?'Chrome':/FxiOS/.test(ua)?'Firefox':/EdgiOS/.test(ua)?'Edge':'';
+  const icono=navigator.standalone===true||!!(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
+  // En iPhone, una app que abre páginas por dentro no trae «Safari/» en su identificación.
+  const dentro=ios&&!icono&&!/Safari\//.test(ua)&&!/CriOS|FxiOS|EdgiOS/.test(ua);
+  const nav=icono?'ícono de inicio':dentro?(app?'dentro de '+app:'dentro de otra app'):(app||(/Safari\//.test(ua)&&!/Chrome|Android/.test(ua)?'Safari':/Chrome/.test(ua)?'Chrome':'navegador'));
+  return {ios,v,icono,dentro,app,nav,ua};
+}
+function rotAyuda(d){
+  const e=d.ent;
+  if(e.icono) return 'Abriste el panel desde el ícono de la pantalla de inicio, y ahí el iPhone a veces no deja imprimir. Abre el panel en Safari e imprime desde ahí';
+  if(e.dentro) return `Abriste el panel dentro de ${e.app||'otra app'}, y ahí no se puede imprimir. Toca los tres puntos o «Abrir en Safari» e imprime desde Safari`;
+  return 'Cierra el navegador del todo (desliza hacia arriba), vuelve a abrir el panel e imprime otra vez. Si sigue igual, reinicia el celular';
+}
 function rotPintarConfirma(){
-  const l=rotPendiente;
-  $('rot-confirma').innerHTML=l?`<div class="pend"><span><b>¿Salieron bien los ${l.length} rótulo(s)?</b> Si sí, quedan contados como impresos para todos. Si algo salió mal, toca «Salió mal» e imprime otra vez.</span><div class="bt"><button class="ok" onclick="rotConfirmar(true)">Sí, salieron bien</button><button onclick="rotConfirmar(false)">Salió mal</button></div></div>`:'';
+  const l=rotPendiente, d=rotDiag;
+  let diag='';
+  if(l&&d&&(d.listo||d.error)){
+    const det=`Detalle para Marvin: ${d.ent.ios?'iPhone iOS '+(d.ent.v||'?'):'no iPhone'} · ${d.ent.nav} · ventana de impresión: ${d.abrio?'sí abrió':'no abrió'}${d.error?' · error: '+d.error:''}`;
+    diag=d.abrio
+      ?`<div style="color:var(--muted);font-size:13px">El celular sí abrió la ventana de impresión. Si no salió papel, el problema es la impresora: que esté prendida, con papel y en el mismo wifi del celular, y elígela en esa ventana<br><small>${esc(det)}</small></div>`
+      :`<div style="color:#f87171"><b>El celular no abrió la ventana de impresión: no se imprimió nada</b><br>${esc(rotAyuda(d))}. Luego toca «Salió mal» e imprime otra vez<br><small style="color:var(--muted)">${esc(det)}</small></div>`;
+  }
+  $('rot-confirma').innerHTML=l?`<div class="pend"><span><b>¿Salieron bien los ${l.length} rótulo(s)?</b> Si sí, quedan contados como impresos para todos. Si algo salió mal, toca «Salió mal» e imprime otra vez.</span>${diag}<div class="bt"><button class="ok" onclick="rotConfirmar(true)">Sí, salieron bien</button><button onclick="rotConfirmar(false)">Salió mal</button></div></div>`:'';
 }
 async function rotConfirmar(ok){
   const l=rotPendiente; rotPendiente=null; rotPintarConfirma();
