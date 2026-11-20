@@ -285,7 +285,7 @@ button,a,label,select,input,textarea,.tab,.ficha{touch-action:manipulation}
 <div id="app">
   <header>
     <div class="logo">Velocity <span>Savage</span> · Importaciones</div>
-    <div style="display:flex;gap:8px"><button class="btn-logout" id="b-act" onclick="actualizarActual()" aria-label="Actualizar esta pestaña"><span aria-hidden="true">↻</span><span class="bt-txt"> Actualizar</span></button><button class="btn-logout" onclick="salir()">Salir</button></div>
+    <div style="display:flex;gap:8px"><button class="btn-logout" id="b-act" onclick="actualizarActual()" aria-label="Actualizar esta pestaña"><span aria-hidden="true">↻</span><span class="bt-txt"> Actualizar</span></button><button class="btn-logout" onclick="abrirChats()" aria-label="Abrir los chats de WhatsApp">Chats</button><button class="btn-logout" onclick="salir()">Salir</button></div>
   </header>
   <main>
     <div class="tabs">
@@ -548,6 +548,15 @@ async function entrar(){
     await env;
     if(ROL==='jp'){ if(typeof envFaltan==='number') pintarPendientes(); else avisoCostos(); }
   }catch(e){ $('lerr').textContent='No se pudo entrar: '+errTxt(e); U=P=''; }
+}
+// CHATS DE WHATSAPP (2026-11-20): la bandeja vive en otro sitio (whatsapp/chats/README.md). Se abre con el mismo
+// usuario y clave de aquí: se le pasan por postMessage solo a ese origen, nunca en el enlace.
+const CHATS='https://vschats.srv1726905.hstgr.cloud';
+function abrirChats(){
+  const w=window.open(CHATS+'/','vschats');
+  if(!w) return location.assign(CHATS+'/');
+  const oir=e=>{ if(e.origin===CHATS&&e.data&&e.data.tipo==='vs-listo'){ w.postMessage({tipo:'vs-entrar',u:U,p:P},CHATS); removeEventListener('message',oir); } };
+  addEventListener('message',oir);
 }
 function salir(){ U=P=''; envios=[]; envCargadoEl=0; envFaltan=undefined; $('app').style.display='none'; $('login').style.display='flex'; $('p').value=''; }
 
