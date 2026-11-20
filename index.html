@@ -505,6 +505,8 @@ async function get(params){ return post(params); }
 // El PDF a Pacho no se repite y espera hasta 5 min (2026-11-12: con muchas prendas pasaba de 35 s, se cortaba y el
 // reintento chocaba con el primero, que seguía armándolo).
 const SIN_REINTENTO={rot_impreso:1,envio_foto:1,pacho_pedir:1,pacho_deshacer:1}, ESPERA={pacho_pedir:300000,pacho_ultimo:90000};
+// Dentro del CRM metido en el panel de Santiago: la sesión va como token (sin cookies de terceros).
+function VS_TOK(){ try{ return (typeof window!=='undefined'&&window.VS_CRM&&window.top!==window)?localStorage.getItem('vs_tok')||'':''; }catch(e){ return ''; } }
 async function post(body){
   const intentos=SIN_REINTENTO[body.action]?1:3;
   let ultimo;
@@ -513,7 +515,7 @@ async function post(body){
     const ctl=new AbortController(), t=setTimeout(()=>ctl.abort(),ESPERA[body.action]||35000);
     try{
       const r=await fetch(API,{method:'POST',body:JSON.stringify({...body,u:U,p:P}),
-        headers:{'Content-Type':'text/plain'},redirect:'follow',signal:ctl.signal});
+        headers:{'Content-Type':'text/plain',...(VS_TOK()?{Authorization:'Bearer '+VS_TOK()}:{})},redirect:'follow',signal:ctl.signal});
       const txt=await r.text();
       let j; try{ j=JSON.parse(txt); }catch(e){ ultimo=new Error('Google respondió con un error'); continue; }
       if(j&&j.error&&/ocupado/i.test(j.error)&&k<intentos-1){ ultimo=new Error(j.error); continue; }
