@@ -471,7 +471,8 @@ button,a,label,select,input,textarea,.tab,.ficha{touch-action:manipulation}
 // ============================================================
 // CONFIG — pega aquí la URL de la implementación del proyecto
 // "Panel importaciones" (NO la del panel de Andreu)
-const API = 'https://script.google.com/macros/s/AKfycbzUL4cY9ZefOLfXfSgaNxgvl3xpIarZgktKqAxn5Cyi6ATd2a46vCLeP51itaIn6xM6/exec';
+// Dentro del CRM (vschats, 2026-11-20) el panel habla por /api/panel: el servidor pone usuario y clave cifrados de la sesión.
+const API = (typeof window!=='undefined' && window.VS_CRM) ? '/api/panel' : 'https://script.google.com/macros/s/AKfycbzUL4cY9ZefOLfXfSgaNxgvl3xpIarZgktKqAxn5Cyi6ATd2a46vCLeP51itaIn6xM6/exec';
 
 let U='', P='';                 // credenciales de la sesión
 let pachoHasta='2026-10-31';     // Pacho cobra $15.000 por prenda solo por las ventas hasta este día
@@ -552,6 +553,16 @@ async function entrar(){
 // CHATS DE WHATSAPP (2026-11-20): la bandeja vive en otro sitio (whatsapp/chats/README.md). Se abre con el mismo
 // usuario y clave de aquí: se le pasan por postMessage solo a ese origen, nunca en el enlace.
 const CHATS='https://vschats.srv1726905.hstgr.cloud';
+// Una sola dirección (Andreu, 2026-11-20): desde la dirección vieja se pasa al CRM si está arriba; si no, se queda aquí.
+if(typeof location!=='undefined' && !window.VS_CRM && /github\.io$/.test(location.hostname)){
+  const ctl=new AbortController(); setTimeout(()=>ctl.abort(),3000);
+  fetch(CHATS+'/salud',{signal:ctl.signal}).then(r=>{ if(r.ok) location.replace(CHATS+'/'); }).catch(()=>{});
+}
+// Dentro del CRM: entra solo (la sesión ya está abierta) y sin «Salir» ni «Chats» propios.
+if(typeof window!=='undefined' && window.VS_CRM) addEventListener('DOMContentLoaded',()=>{
+  document.querySelectorAll('[onclick="salir()"],[onclick="abrirChats()"]').forEach(b=>b.remove());
+  $('u').value='crm'; $('p').value='crm'; entrar();
+});
 function abrirChats(){
   const w=window.open(CHATS+'/','vschats');
   if(!w) return location.assign(CHATS+'/');
