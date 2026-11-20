@@ -561,7 +561,10 @@ if(typeof location!=='undefined' && !window.VS_CRM && /github\.io$/.test(locatio
 // Dentro del CRM: entra solo (la sesión ya está abierta) y sin «Salir» ni «Chats» propios.
 if(typeof window!=='undefined' && window.VS_CRM) addEventListener('DOMContentLoaded',()=>{
   document.querySelectorAll('[onclick="salir()"],[onclick="abrirChats()"]').forEach(b=>b.remove());
-  $('u').value='crm'; $('p').value='crm'; entrar();
+  // Sin pantalla de login: un «Cargando» mientras el CRM confirma la sesión (el login lo responde el servidor al instante).
+  $('login').innerHTML='<div style="margin:auto;color:#A7ACB5;font:16px system-ui">Cargando…</div>';
+  $('login').insertAdjacentHTML('beforeend','<input id="u" type="hidden" value="crm"><input id="p" type="hidden" value="crm"><div id="lerr" style="color:#ff6b6b;text-align:center"></div>');
+  entrar();
 });
 function abrirChats(){
   const w=window.open(CHATS+'/','vschats');
