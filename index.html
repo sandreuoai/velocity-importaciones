@@ -348,7 +348,7 @@ button,a,label,select,input,textarea,.tab,.ficha{touch-action:manipulation}
           <button class="btn-fs" id="b-rot-desp" onclick="rotVerDespachados()">Ver despachados</button>
         </div>
       </div>
-      <input type="search" class="search" id="rot-q" placeholder="Buscar nombre, cédula, celular, ciudad, producto o #..." oninput="pintarRotulos()" style="margin-bottom:10px" aria-label="Buscar rótulos"/>
+      <input type="search" class="search" id="rot-q" placeholder="Buscar nombre, cédula, celular, ciudad, producto o #..." oninput="if(!buscarSinFechas('rot-q','rot-dias',cargarRotulos)) pintarRotulos()" style="margin-bottom:10px" aria-label="Buscar rótulos"/>
       <div id="rot-confirma"></div>
       <div id="rot-aviso"></div>
       <div id="rot-lista"><div class="loading">Cargando...</div></div>
@@ -366,7 +366,7 @@ button,a,label,select,input,textarea,.tab,.ficha{touch-action:manipulation}
       <div class="hdr">
         <span class="t" id="reg-n">Ventas</span>
         <div class="acc">
-          <input type="search" class="search" id="reg-q" placeholder="Buscar cliente, celular, producto o #..." oninput="pintarRegistro()"/>
+          <input type="search" class="search" id="reg-q" placeholder="Buscar cliente, celular, producto, # de venta o # de Shopify..." oninput="if(!buscarSinFechas('reg-q','reg-dias',cargarRegistro)) pintarRegistro()"/>
           <select class="sel" id="reg-dias" onchange="cargarRegistro()" aria-label="Desde cuándo"><option value="15">Últimos 15 días</option><option value="45" selected>Últimos 45 días</option><option value="120">Últimos 120 días</option></select>
           <button class="btn-fs" onclick="cargarRegistro()">Actualizar</button>
         </div>
@@ -656,7 +656,17 @@ function ordenar(l,modo){
 }
 function envFiltro(v){ envF=v; envForm=null; envVer=50; pintarEnvios(); }
 // Escribir en el buscador espera 150 ms (2026-11-11): antes pintaba todas las tarjetas con cada letra.
-function envBuscar(){ clearTimeout(envQT); envVer=50; envQT=setTimeout(pintarEnvios,150); }
+function envBuscar(){ clearTimeout(envQT); envVer=50; if(buscarSinFechas('env-q','env-dias',()=>cargarEnvios())) return; envQT=setTimeout(pintarEnvios,150); }
+// Buscar sin pensar en fechas (Andreu, 2026-11-24: «explicar esos filtros persistentes está difícil… para dummies»):
+// al escribir, la pestaña trae lo más largo que da el servidor (Envíos y Rótulos 90 días, Registro 120); al borrar
+// la búsqueda vuelve sola al período que estaba. Devuelve true si recargó (la recarga pinta con la búsqueda).
+function buscarSinFechas(qId,selId,recargar){
+  const q=($(qId).value||'').trim(), sel=$(selId), max=Array.from((sel&&sel.options)||[]).map(o=>o.value).sort((a,b)=>b-a)[0];
+  if(!max) return false;
+  if(q&&sel.value!==max){ sel.dataset.antes=sel.value; sel.value=max; recargar(); return true; }
+  if(!q&&sel.dataset.antes){ sel.value=sel.dataset.antes; delete sel.dataset.antes; recargar(); return true; }
+  return false;
+}
 
 function pintarEnvios(){
   const cnt={}; Object.keys(envGrupo).forEach(k=>cnt[k]=0);
@@ -1420,7 +1430,9 @@ async function cargarRegistro(){
     ventasReg=r.ventas||[]; pintarRegistro();
   }catch(e){ $('reg-lista').innerHTML=`<div class="vacio">No cargó: ${esc(errTxt(e))}</div>`; }
 }
-function regBuscar(x,q){ return !q||[x.nombre,x.cel,x.producto,x.ciudad,'#'+x.id,x.id].some(v=>String(v||'').toLowerCase().includes(q)); }
+// También por el # de Shopify (Andreu, 2026-11-24: buscó «1700» y no salía la venta #1095): se toma de Envíos.
+function regBuscar(x,q){ if(!q) return true; const e=envios.find(v=>String(v.id)===String(x.id));
+  return [x.nombre,x.cel,x.producto,x.ciudad,'#'+x.id,x.id,x.cedula,e&&e.shopify&&e.shopify.pedido,e&&e.shopifyPedido].some(v=>String(v||'').toLowerCase().includes(q)); }
 function pintarRegistro(){
   const q=($('reg-q').value||'').toLowerCase().trim();
   const l=ventasReg.map((x,i)=>({x,i})).filter(o=>regBuscar(o.x,q));
