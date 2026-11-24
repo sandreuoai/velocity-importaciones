@@ -719,7 +719,7 @@ function envTarjeta(x,i){
     <div class="ptop"><div style="flex:1;min-width:0">
       <div class="pprod">${esc(rotItems(x.producto).join(' · ')||'(sin producto)')}</div>
       <div>${chips}</div>
-      <div class="pmeta">${esc(x.persona||'—')} · ${esc(x.ciudad||'sin ciudad')} · vendido ${fFecha(x.fecha)} · #${esc(x.id)}${x.numero?' · '+esc(x.numero):''}</div>
+      <div class="pmeta">${esc(x.persona||'—')} · ${esc(x.ciudad||'sin ciudad')} · vendido ${fFecha(x.fecha)} · ${numPed(x)}${x.numero?' · '+esc(x.numero):''}</div>
       ${guia}${privada}${foto}
     </div></div>
     <div class="pctrl">
@@ -736,6 +736,9 @@ function envTarjeta(x,i){
 // Con todas marcadas el pedido se mueve solo: todo en bodega → Por preparar; alguna de importación → Pedir a Pacho.
 const EST_AUTO=['POR REVISAR','POR PEDIR','ENTREGADO'];   // Entregado lo pone el servidor a los 4 días de despachado
 let envOrigenAbierto=null;
+// Un pedido, dos números (2026-11-24): el de esta hoja (1273) y el que ve el cliente y el CRM en la tienda (#1786).
+// Siempre los dos y rotulados, para que nadie los confunda.
+function numPed(x){ return `Pedido ${esc(x.id)}${x.shopifyPedido?` · tienda ${esc(x.shopifyPedido)}`:''}`; }   // función: se puede usar antes de esta línea
 function envOrigenBloque(x,i){
   const pr=x.prendas||[];
   if(!pr.length) return '';
@@ -980,7 +983,7 @@ function rotFila(x){
   return `<label class="rot ${f.length?'falta':''}">
     <input type="checkbox" ${rotSel.has(x.id)?'checked':''} onchange="rotToggle(${rotulos.indexOf(x)},this.checked)">
     <div class="rb">
-      <b>${x.persona?esc(x.persona):rojo('SIN NOMBRE')}</b> <span class="prod">#${esc(x.id)}</span>${chips}<br>
+      <b>${x.persona?esc(x.persona):rojo('SIN NOMBRE')}</b> <span class="prod">${numPed(x)}</span>${chips}<br>
       CC ${x.cedula?esc(x.cedula):rojo('falta')} · Cel ${x.numero?esc(x.numero):rojo('falta')}<br>
       ${x.direccion?esc(x.direccion):rojo('falta dirección')} · ${rotLugar(x)?esc(rotLugar(x)):rojo('falta ciudad / departamento')}
       <div class="prod">${x.producto?esc(rotItems(x.producto).join(' · ')):rojo('sin producto')}</div>
@@ -1293,7 +1296,7 @@ function pintarPedir(){
         <div style="flex:1;min-width:0">
           <div class="pprod">${esc(x.titulo)}</div>
           <div style="margin:6px 0"><span class="ped-talla">${esc(x.talla||'Única')}</span>${x.opciones?`<span class="pmeta">${esc(x.opciones)}</span>`:''}</div>
-          <div class="pmeta">${esc(x.persona||'—')} · compró ${fFecha(x.fecha)} · #${esc(x.id)}${x.canal==='SHOPIFY'?' · página':''}</div>
+          <div class="pmeta">${esc(x.persona||'—')} · compró ${fFecha(x.fecha)} · ${numPed(x)}${x.canal==='SHOPIFY'&&!x.shopifyPedido?' · página':''}</div>
           <div>${plazoChip(x.limite,'')}</div>
         </div>
       </div>
