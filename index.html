@@ -310,7 +310,7 @@ button,a,label,select,input,textarea,.tab,.ficha{touch-action:manipulation}
           <option value="NUEVOS" selected>Más recientes primero</option><option value="VENCE">Por vencer primero</option>
         </select>
         <select class="sel" id="env-dias" style="width:auto" onchange="cargarEnvios()" aria-label="Despachados y entregados de cuántos días">
-          <option value="15">Despachados: 15 días</option><option value="30" selected>Despachados: 30 días</option><option value="90">Despachados: 90 días</option>
+          <option value="15">Despachados: 15 días</option><option value="30" selected>Despachados: 30 días</option><option value="90">Despachados: 90 días</option><option value="180">Despachados: 180 días</option>
         </select>
       </div>
       <div id="env-lista"><div class="loading">Cargando...</div></div>
@@ -341,7 +341,7 @@ button,a,label,select,input,textarea,.tab,.ficha{touch-action:manipulation}
           <select class="sel" id="rot-dias" onchange="cargarRotulos()">
             <option value="3">Últimos 3 días</option><option value="7">Últimos 7 días</option>
             <option value="15" selected>Últimos 15 días</option><option value="30">Últimos 30 días</option>
-            <option value="90">Últimos 90 días</option>
+            <option value="90">Últimos 90 días</option><option value="180">Últimos 180 días</option>
           </select>
           <button class="btn-fs" onclick="rotMarcarListos()">Seleccionar todo</button>
           <button class="btn-fs" onclick="rotDesmarcar()">Desmarcar</button>
@@ -367,7 +367,7 @@ button,a,label,select,input,textarea,.tab,.ficha{touch-action:manipulation}
         <span class="t" id="reg-n">Ventas</span>
         <div class="acc">
           <input type="search" class="search" id="reg-q" placeholder="Buscar cliente, celular, producto, # de venta o # de Shopify..." oninput="if(!buscarSinFechas('reg-q','reg-dias',cargarRegistro)) pintarRegistro()"/>
-          <select class="sel" id="reg-dias" onchange="cargarRegistro()" aria-label="Desde cuándo"><option value="15">Últimos 15 días</option><option value="45" selected>Últimos 45 días</option><option value="120">Últimos 120 días</option></select>
+          <select class="sel" id="reg-dias" onchange="cargarRegistro()" aria-label="Desde cuándo"><option value="15">Últimos 15 días</option><option value="45" selected>Últimos 45 días</option><option value="120">Últimos 120 días</option><option value="240">Últimos 240 días</option></select>
           <button class="btn-fs" onclick="cargarRegistro()">Actualizar</button>
         </div>
       </div>
@@ -658,7 +658,7 @@ function envFiltro(v){ envF=v; envForm=null; envVer=50; pintarEnvios(); }
 // Escribir en el buscador espera 150 ms (2026-11-11): antes pintaba todas las tarjetas con cada letra.
 function envBuscar(){ clearTimeout(envQT); envVer=50; if(buscarSinFechas('env-q','env-dias',()=>cargarEnvios())) return; envQT=setTimeout(pintarEnvios,150); }
 // Buscar sin pensar en fechas (Andreu, 2026-11-24: «explicar esos filtros persistentes está difícil… para dummies»):
-// al escribir, la pestaña trae lo más largo que da el servidor (Envíos y Rótulos 90 días, Registro 120); al borrar
+// al escribir, la pestaña trae lo más largo que da el servidor (Envíos y Rótulos 180 días, Registro 240); al borrar
 // la búsqueda vuelve sola al período que estaba. Devuelve true si recargó (la recarga pinta con la búsqueda).
 function buscarSinFechas(qId,selId,recargar){
   const q=($(qId).value||'').trim(), sel=$(selId), max=Array.from((sel&&sel.options)||[]).map(o=>o.value).sort((a,b)=>b-a)[0];
