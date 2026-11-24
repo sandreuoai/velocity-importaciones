@@ -294,7 +294,6 @@ button,a,label,select,input,textarea,.tab,.ficha{touch-action:manipulation}
       <button class="tab" onclick="ir('rotulos',this)">Rótulos</button>
       <button class="tab" onclick="ir('registro',this)">Registro de ventas</button>
       <button class="tab solo-jp" id="tab-costos" onclick="ir('costos',this)">Costos</button>
-      <button class="tab solo-jp" id="tab-pacho" onclick="ir('pacho',this)">Pacho</button>
       <button class="tab solo-jp" onclick="ir('deuda',this)">Deuda</button>
       <button class="tab solo-jp" onclick="ir('ventas',this)">Ventas</button>
     </div>
@@ -387,36 +386,6 @@ button,a,label,select,input,textarea,.tab,.ficha{touch-action:manipulation}
         </div>
       </div>
       <div id="costos-lista"><div class="loading">Cargando...</div></div>
-    </div>
-
-    <div class="page" id="pg-pacho">
-      <div id="pacho-fin"></div>
-      <div class="cards" id="c-pacho"><div class="loading">Cargando...</div></div>
-      <div class="chart-card">
-        <div class="ct">Pedidos gestionados con Pacho, por mes</div>
-        <div style="position:relative;height:220px"><canvas id="ch-pacho"></canvas></div>
-      </div>
-      <div class="chart-card">
-        <div class="ct">Detalle por mes</div>
-        <ul class="rk" id="rk-pacho"><li class="loading" style="padding:20px 0">Cargando...</li></ul>
-      </div>
-      <div class="chart-card">
-        <div class="ct">Marcar pagado a Pacho</div>
-        <div class="hdr" style="margin:0"><div class="acc">
-          <label style="color:var(--muted);font-size:13px">Le pagué todo lo pedido hasta</label>
-          <input type="date" class="search" id="pacho-hasta"/>
-          <button class="btn-f" onclick="pachoPagarHasta()">Marcar pagado</button>
-        </div></div>
-      </div>
-      <div class="hdr">
-        <span class="t" id="pacho-n">Pedidos con Pacho</span>
-        <div class="acc">
-          <input type="search" class="search" id="pacho-q" placeholder="Buscar cliente o producto..." oninput="pintarPachoLista()"/>
-          <select class="search" id="pacho-f" onchange="pintarPachoLista()"><option value="NO">Sin pagar</option><option value="SI">Pagados</option><option value="">Todos</option></select>
-        </div>
-      </div>
-      <div id="pacho-lista"></div>
-      <div class="pacho-barra" id="pacho-barra" hidden></div>
     </div>
 
     <div class="page" id="pg-deuda">
@@ -545,7 +514,6 @@ async function entrar(){
     pachoHasta=r.pachoHasta||pachoHasta; ROL=r.rol||'jp';
     // El operador (Andreu, 2026-10-30) no ve costos, pagos a Pacho, deuda ni el resumen; el servidor igual se lo frena.
     document.querySelectorAll('.solo-jp').forEach(b=>{ b.hidden=ROL!=='jp'; });
-    $('tab-pacho').hidden=ROL!=='jp'||r.pachoVisible===false;   // desde noviembre Pacho tiene sueldo: la pestaña se va al quedar en $0
     pintarPendientes();
     // Cuántos pedidos sin costo ya lo trae «envios» (faltanCostos); con un servidor viejo se pide «costos» como antes.
     await env;
@@ -579,7 +547,7 @@ function salir(){ U=P=''; envios=[]; envCargadoEl=0; envFaltan=undefined; $('app
 let pgActual='envios';
 async function actualizarActual(){
   const b=$('b-act'); b.disabled=true; b.style.opacity='.5';
-  const f={envios:()=>cargarEnvios({forzar:true}),pedir:cargarPedir,rotulos:cargarRotulos,costos:cargarCostos,pacho:cargarPacho,deuda:cargarDeuda,ventas:cargarVentas}[pgActual];
+  const f={envios:()=>cargarEnvios({forzar:true}),pedir:cargarPedir,rotulos:cargarRotulos,costos:cargarCostos,deuda:cargarDeuda,ventas:cargarVentas}[pgActual];
   try{ await f(); toast('Actualizado'); }catch(e){ toast('No se pudo actualizar','err'); }
   b.disabled=false; b.style.opacity='';
 }
@@ -592,7 +560,6 @@ function ir(pg,btn){
   if(pg==='pedir') cargarPedir();
   if(pg==='rotulos') cargarRotulos();
   if(pg==='costos') cargarCostos();
-  if(pg==='pacho') cargarPacho();
   if(pg==='deuda') cargarDeuda();
   if(pg==='registro') cargarRegistro();
   if(pg==='ventas' && !$('d1').value){ rangoMes(0); }
@@ -600,7 +567,7 @@ function ir(pg,btn){
 
 // ============================================================
 // PENDIENTES DE JUAN PABLO (arriba de Envíos). La pestaña «Importaciones» se quitó el 2026-10-22 (Andreu: «es
-// redundante»): el estado de cada pedido vive en Envíos y la deuda con Pacho en su pestaña.
+// redundante»): el estado de cada pedido vive en Envíos. La pestaña Pacho se quitó el 2026-11-24 (Andreu: desde noviembre tiene sueldo y lo de octubre ya está pagado).
 // ---- Pendientes de Juan Pablo: se calculan solos, se pueden marcar «Hecho» o cerrar ----
 // «Hecho» lo esconde hasta que el problema CREZCA (si hoy hay 14 sin costo y mañana 15, vuelve).
 // «Cerrar» lo esconde hasta mañana. Se guarda en este aparato (localStorage); si no hay, sigue visible.
@@ -1258,49 +1225,6 @@ async function costoGuardar(i){
 }
 
 // ============================================================
-// PACHO
-async function cargarPacho(){
-  try{
-    const r=await get({action:'pacho'});
-    if(r.error){ $('c-pacho').innerHTML=`<div class="loading">${esc(r.error)}</div>`; return; }
-    const m=r.meses||[];
-    $('pacho-fin').innerHTML=`<div class="aviso info">Desde el 1 de noviembre Pacho tiene sueldo: solo las ventas hasta el ${fFecha(r.tarifaHasta)} cobran ${cop(r.valorPacho)} por prenda. ${hoy()>r.tarifaHasta?'Cuando le pagues todo, esta pestaña desaparece sola':'Después de pagarle ese saldo, esta pestaña desaparece sola'}</div>`;
-    if(r.visible===false) $('tab-pacho').hidden=true;
-    pachoPed=r.pedidos||[]; pachoSel=new Set(); pintarPachoLista();
-    if(!$('pacho-hasta').value) $('pacho-hasta').value=new Date().toLocaleDateString('en-CA');
-    const act=m.length?m[m.length-1]:null, ant=m.length>1?m[m.length-2]:null;
-    let tend='—', clase='';
-    if(act&&ant){
-      const d=act.pedidos-ant.pedidos;
-      tend = d<0 ? `▼ ${Math.abs(d)} menos que el mes pasado` : d>0 ? `▲ ${d} más que el mes pasado` : 'igual que el mes pasado';
-      clase = d<0?'green':d>0?'amber':'';
-    }
-    $('c-pacho').innerHTML=`
-      <div class="card"><div class="lbl">Le debes a Pacho</div><div class="val ${r.saldo>0?'amber':'green'}">${cop(r.saldo)}</div><div class="sub">${r.pedidosPendientes} prendas ${r.ultimoPago?'desde el último pago ('+fFecha(r.ultimoPago)+')':'sin pagar'} hasta las ventas del ${fFecha(r.tarifaHasta)}${r.porPedirConTarifa?` · faltan ${r.porPedirConTarifa} por pedirle (suman ${cop(r.porPedirConTarifa*r.valorPacho)})`:''}</div></div>
-      <div class="card"><div class="lbl">Este mes</div><div class="val">${act?act.pedidos:0}</div><div class="sub ${clase==='green'?'':'warn'}" style="${clase==='green'?'color:var(--green)':''}">${tend}</div></div>
-      <div class="card"><div class="lbl">Ya le pagaste</div><div class="val green">${cop(r.pagado||0)}</div><div class="sub">De ${cop(r.totalHistorico)} en total (${r.pedidosTotal} pedidos)</div></div>
-      <div class="card"><div class="lbl">Tarifa</div><div class="val">${cop(r.valorPacho)}</div><div class="sub">Por pedido gestionado</div></div>`;
-
-    destroy('pacho');
-    ch.pacho=new Chart($('ch-pacho'),{type:'bar',
-      data:{labels:m.map(x=>{const[y,mm]=x.mes.split('-');return MES[parseInt(mm)-1]+' '+y.slice(2)}),
-        datasets:[{label:'Pedidos',data:m.map(x=>x.pedidos),backgroundColor:'#c084fc',borderRadius:4,borderSkipped:false}]},
-      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
-        scales:{x:{grid:{color:'rgba(255,255,255,.04)'},ticks:{color:'#aaa',font:{size:11}}},
-          y:{grid:{color:'rgba(255,255,255,.04)'},ticks:{color:'#666',font:{size:10},precision:0}}}}});
-
-    const max=Math.max(...m.map(x=>x.valor),1);
-    $('rk-pacho').innerHTML = m.length ? m.slice().reverse().map(x=>{
-      const[y,mm]=x.mes.split('-');
-      return `<li class="rki"><span class="rkn"></span>
-        <span class="rkname">${MES[parseInt(mm)-1]} ${y} <span style="color:var(--muted);font-size:11px">${x.pedidos} pedidos</span></span>
-        <div class="rkbw"><div class="rkb" style="width:${Math.round(x.valor/max*100)}%;background:#c084fc"></div></div>
-        <span class="rkv">${cop(x.valor)}</span></li>`;}).join('')
-      : '<li style="padding:16px 0;color:var(--muted);font-size:12px;text-align:center">Todavía no has usado a Pacho</li>';
-  }catch(e){ $('c-pacho').innerHTML='<div class="loading">Error de conexión</div>'; }
-}
-
-// ============================================================
 // PEDIR A PACHO (2026-10-22) — el pedido a China sale de aquí, no del Excel.
 // Cada prenda de importación que sigue «En China» y no se le ha pedido. Juan Pablo elige, corrige el dorsal y escribe
 // la observación; el servidor arma el PDF por camiseta y anota cada prenda en Importaciones con $15.000 para Pacho.
@@ -1447,82 +1371,18 @@ function pedBajar(){
   document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },4000);
 }
 
-// Pago a Pacho (2026-10-05): pedido por pedido o «todo hasta tal fecha», entregados incluidos.
-// El servidor revisa cada pedido y el total antes de escribir: si algo cambió, no marca nada.
-let pachoPed=[], pachoBusy=false, pachoSel=new Set();
-function pintarPachoLista(){
-  const q=($('pacho-q').value||'').toLowerCase(), f=$('pacho-f').value;
-  const l=pachoPed.map((x,i)=>({x,i})).filter(o=>(!f||(f==='SI')===o.x.pagado)&&
-    (!q||(o.x.persona||'').toLowerCase().includes(q)||(o.x.producto||'').toLowerCase().includes(q)));
-  $('pacho-n').textContent=`${f==='NO'?'Sin pagar':f==='SI'?'Pagados':'Todos'} (${l.length}) · ${cop(l.reduce((s,o)=>s+o.x.valor,0))}`;
-  pachoVisibles=l.filter(o=>!o.x.pagado).map(o=>o.i);
-  $('pacho-lista').innerHTML=l.length?l.map(({x,i})=>`<div class="pedido ${x.pagado?'listo':'pend'}">
-    <div class="ptop">
-      <div style="flex:1;min-width:0">
-        <div class="pprod">${esc(x.producto)}${x.entregado?'<span class="chip">entregado</span>':''}</div>
-        <div class="pmeta">${esc(x.persona||'—')} · ${x.fechaCompra?'compró '+fFecha(x.fechaCompra)+' · ':''}pedido ${fFecha(x.fecha)}${x.pagado&&x.pagadoEl?' · pagado '+fFecha(x.pagadoEl):''}</div>
-        ${x.obs?`<div class="pmeta">${esc(obsTxt(x.obs))}</div>`:''}
-      </div>
-      <div class="pmoney"><b>${cop(x.valor)}</b>${x.pagado?'pagado':'sin pagar'}</div>
-    </div>
-    ${x.pagado?`<button class="btn-fs" onclick="pachoPagarUno(${i})">Quitar pago</button>`
-      :`<label class="psel"><input type="checkbox" ${pachoSel.has(i)?'checked':''} onchange="pachoElegir(${i},this.checked)"> Elegir para pagar</label>`}
-  </div>`).join(''):'<div class="vacio"><div>No hay pedidos con ese filtro.</div></div>';
-  pintarPachoBarra();
-}
-// Varios a la vez: se eligen con la casilla y se pagan juntos desde la barra de abajo.
-let pachoVisibles=[];
-function pachoElegir(i,on){ if(on) pachoSel.add(i); else pachoSel.delete(i); pintarPachoBarra(); }
-function pachoTodos(){ const todos=pachoVisibles.every(i=>pachoSel.has(i)); pachoVisibles.forEach(i=>todos?pachoSel.delete(i):pachoSel.add(i)); pintarPachoLista(); }
-function pintarPachoBarra(){
-  const b=$('pacho-barra'), l=[...pachoSel].map(i=>pachoPed[i]).filter(x=>x&&!x.pagado);
-  b.hidden=!pachoVisibles.length;
-  if(b.hidden) return;
-  const todos=pachoVisibles.length&&pachoVisibles.every(i=>pachoSel.has(i));
-  b.innerHTML=`<b>${l.length?`${l.length} elegido${l.length===1?'':'s'} · ${cop(l.reduce((s,x)=>s+x.valor,0))}`:'Elige los que le vas a pagar'}</b>
-    <button class="btn-fs" onclick="pachoTodos()">${todos?'Quitar todos':'Elegir todos'}</button>
-    <button class="btn-ok" onclick="pachoPagarElegidos()" ${l.length?'':'disabled'}>Pagar elegidos</button>`;
-}
-function pachoPagarElegidos(){
-  const lista=[...pachoSel].map(i=>pachoPed[i]).filter(x=>x&&!x.pagado);
-  if(!lista.length) return;
-  pachoMarcar(lista,true,`¿Marcar como PAGADOS a Pacho ${lista.length} pedido${lista.length===1?'':'s'}, por ${cop(lista.reduce((s,x)=>s+x.valor,0))}?`);
-}
-async function pachoMarcar(lista,pagado,pregunta){
-  if(pachoBusy||!lista.length) return;
-  const total=lista.reduce((s,x)=>s+x.valor,0);
-  if(!confirm(pregunta)) return;
-  pachoBusy=true;
-  try{
-    const r=await post({action:'pacho_pagar',pagado,totalEsperado:total,
-      pedidos:lista.map(x=>({hoja:x.hoja,fila:x.fila,producto:x.producto}))});
-    if(r.error) toast('No se marcó nada: '+r.error,'err');
-    else toast(`Listo: ${r.marcados} pedido${r.marcados===1?'':'s'} por ${cop(r.total)}.`);
-  }catch(e){ toast('No se pudo guardar: '+errTxt(e),'err'); }
-  finally{ pachoBusy=false; cargarPacho(); }
-}
-function pachoPagarHasta(){
-  const hasta=$('pacho-hasta').value;
-  if(!hasta){ toast('Escoge la fecha.','err'); return; }
-  const lista=pachoPed.filter(x=>!x.pagado&&x.fecha&&x.fecha<=hasta);
-  if(!lista.length){ toast('No hay pedidos sin pagar hasta esa fecha.','err'); return; }
-  pachoMarcar(lista,true,`¿Marcar como PAGADOS a Pacho ${lista.length} pedido${lista.length===1?'':'s'} hasta el ${fFecha(hasta)}, por ${cop(lista.reduce((s,x)=>s+x.valor,0))}?\n\nIncluye los ya entregados.`);
-}
-function pachoPagarUno(i){
-  const x=pachoPed[i]; if(!x) return;
-  pachoMarcar([x],!x.pagado,`¿${x.pagado?'Quitar el pago de':'Marcar pagado'} «${x.producto}» (${cop(x.valor)})?`);
-}
-
 // ============================================================
 // DEUDA OPERACIONAL
 async function cargarDeuda(){
   try{
     const r=await get({action:'deuda'});
     if(r.error){ $('c-deuda').innerHTML=`<div class="loading">${esc(r.error)}</div>`; return; }
+    const aFavor=r.saldo<0;
     $('c-deuda').innerHTML=`
-      <div class="card" style="border-color:rgba(221,22,22,.4)"><div class="lbl">💰 Saldo a tu favor</div><div class="val ${r.saldo>0?'red':'green'}">${cop(r.saldo)}</div><div class="sub">Lo que Velocity te debe hoy</div></div>
+      <div class="card" style="border-color:${aFavor?'rgba(74,222,128,.4)':'rgba(221,22,22,.4)'}"><div class="lbl">${aFavor?'✅ Saldo a favor':'💰 Saldo con Juan Pablo'}</div><div class="val ${r.saldo>0?'red':'green'}">${cop(Math.abs(r.saldo))}</div><div class="sub">${aFavor?'Se abonó de más: se descuenta del próximo costo':'Lo que se le debe hoy'}</div></div>
       <div class="card"><div class="lbl">Costo operacional del período</div><div class="val">${cop(r.causada)}</div><div class="sub">${r.liquidadas} pedidos liquidados desde el 1 Jul</div></div>
       <div class="card"><div class="lbl">Abonos que has recibido</div><div class="val green">${cop(r.abonos)}</div><div class="sub">${r.listaAbonos.length} abonos</div></div>
+      ${r.contraentregas?`<div class="card"><div class="lbl">Contraentregas</div><div class="val green">${cop(r.contraentregas)}</div><div class="sub">${r.nContraentrega} ventas que cobraste directo: abonan solas</div></div>`:''}
       <div class="card"><div class="lbl">Por liquidar</div><div class="val ${r.pendientes?'amber':'green'}">${r.pendientes}</div><div class="sub">${r.pendientes?'Pedidos sin costo cargado: el saldo va a subir':'Todo liquidado'}</div></div>`;
 
     $('aviso-deuda').innerHTML = r.pendientes
