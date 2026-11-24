@@ -1440,18 +1440,36 @@ function pintarRegistro(){
     ${regAbierta===x.id?regForm(x,i,dev):`<div class="bt"><button class="btn-fs" onclick="regAbrir(${i})">Corregir</button>${dev?'':`<button class="btn-fs" onclick="regDevolucion(${i})">Marcar devolución</button>`}<button class="btn-fs" onclick="regEliminar(${i})">Eliminar</button></div>`}
   </div>`;}).join('')+(l.length>150?`<div class="vacio">Hay ${l.length-150} más: búscala por nombre, celular o #.</div>`:'');
 }
-function regAbrir(i){ regAbierta=ventasReg[i]&&ventasReg[i].id; pintarRegistro(); }
+// Costos en Registro (Andreu, 2026-11-24): «Corregir» también carga o edita inversión y envío, con la misma regla y
+// el mismo guardado de la pestaña Costos (costo_guardar). Solo Juan Pablo: el operador no ve costos.
+const regCosto=x=>costos.find(c=>String(c.id)===String(x.id));
+async function regAbrir(i){
+  regAbierta=ventasReg[i]&&ventasReg[i].id; pintarRegistro();
+  if(ROL==='jp'&&!costos.length){ try{ const r=await get({action:'costos'}); if(!r.error){ costos=r.pedidos||[]; costosContar(); if(regAbierta) pintarRegistro(); } }catch(e){} }
+}
 function regForm(x,i){
   return `<div class="pctrl">${REG_CAMPOS.map(([k,t])=>`<label class="chk" style="flex-direction:column;align-items:stretch;gap:4px;min-height:0">${t}
     ${k==='producto'||k==='notas'?`<textarea class="obs" id="rg-${k}" rows="2">${esc(x[k])}</textarea>`
       :`<input class="obs" id="rg-${k}" ${k==='venta'?'data-cop ':''}${k==='venta'||k==='cel'||k==='cedula'?'inputmode="numeric"':''} value="${esc(k==='venta'?(x.venta||''):x[k])}">`}</label>`).join('')}
+    ${ROL!=='jp'?'':(()=>{ const c=regCosto(x); return c?`<label class="chk" style="flex-direction:column;align-items:stretch;gap:4px;min-height:0">Inversión<input class="obs" id="rg-inv" data-cop inputmode="numeric" value="${c.inversion||''}" placeholder="$ 0"></label><label class="chk" style="flex-direction:column;align-items:stretch;gap:4px;min-height:0">Envío<input class="obs" id="rg-env" data-cop inputmode="numeric" value="${c.envio||''}" placeholder="$ 0"></label>`
+      :`<div class="pmeta" style="flex-basis:100%">${costos.length?'Este pedido no está en Costos: su costo se carga allá cuando aparezca':'Cargando el costo...'}</div>`; })()}
     <div class="bt"><button class="btn-ok" onclick="regGuardar(${i})">Guardar</button><button class="btn-fs" onclick="regAbierta=null;pintarRegistro()">Cancelar</button></div></div>`;
 }
 function regGuardar(i){
   const x=ventasReg[i]; if(!x) return;
   const campos={}, antes={};
   REG_CAMPOS.forEach(([k])=>{ let v=$('rg-'+k).value.trim(); if(k==='venta') v=soloNum(v); if(String(v)!==String(x[k]??'')){ campos[k]=v; antes[k]=x[k]; } });
-  if(!Object.keys(campos).length){ toast('No cambió nada'); regAbierta=null; pintarRegistro(); return; }
+  const c=ROL==='jp'&&$('rg-inv')?regCosto(x):null, inv=c?soloNum($('rg-inv').value):0, env=c?soloNum($('rg-env').value):0;
+  const cambiaCosto=c&&(inv!==(c.inversion||0)||env!==(c.envio||0))&&(inv||env);
+  if(cambiaCosto&&(!(inv>0)||!(env>0))){ toast('Pon la inversión Y el envío (los dos mayores que cero)','err'); return; }
+  if(cambiaCosto&&c.inversion>0&&c.envio>0&&!confirm(`Este pedido ya tenía costo.\n\nAntes: inversión ${cop(c.inversion)} · envío ${cop(c.envio)}\nAhora: inversión ${cop(inv)} · envío ${cop(env)}\n\n¿Cambiarlo?`)) return;
+  if(cambiaCosto){
+    const antesC={inversion:c.inversion,envio:c.envio,falta:c.falta};
+    c.inversion=inv; c.envio=env; c.falta=false; costosContar();
+    post({action:'costo_guardar',id:x.id,inversion:inv,envio:env}).then(r=>{ if(r.error) throw new Error(r.error); })
+      .catch(e=>{ Object.assign(c,antesC); costosContar(); toast(`#${x.id}: el costo NO se guardó: `+errTxt(e),'err'); });
+  }
+  if(!Object.keys(campos).length){ toast(cambiaCosto?'Costo guardado ✓':'No cambió nada'); regAbierta=null; pintarRegistro(); return; }
   if('venta' in campos&&!(campos.venta>0)){ toast('El valor tiene que ser mayor que cero','err'); return; }
   if(campos.cel!==undefined&&campos.venta!==undefined&&campos.nombre!==undefined){ toast('Cambiar celular, valor y nombre a la vez ya es otra venta: elimínala y que la registren de nuevo','err'); return; }
   Object.assign(x,campos); regAbierta=null; pintarRegistro(); toast('Guardado ✓');
