@@ -1180,7 +1180,7 @@ function pintarCostos(){
   $('c-costos').innerHTML=`
     <div class="card"><div class="lbl">Sin costo</div><div class="val ${faltan.length?'amber':'green'}">${faltan.length}</div><div class="sub">${faltan.length?'Pedidos sin inversión o envío':'Todo cargado'}</div></div>
     ${faltan.length?`<div class="card"><div class="lbl">Vendido sin costo</div><div class="val">${cop(sinCosto)}</div><div class="sub">No suma a tu saldo todavía</div></div>`:''}
-    ${nIA?`<div class="card"><div class="lbl">Envío lo puso la IA</div><div class="val" style="color:#7cb4f5">${nIA}</div><div class="sub">Revisa que el valor esté bien</div></div>`:''}`;
+    ${nIA?`<div class="card"><div class="lbl">Envío que puso la IA</div><div class="val" style="color:#7cb4f5">${nIA}</div><div class="sub">Revisa que el valor esté bien</div></div>`:''}`;
   let l=costos.map((x,i)=>({x,i})).filter(o=>costosTodos||o.x.falta);
   if(q) l=l.filter(o=>(o.x.persona||'').toLowerCase().includes(q)||(o.x.producto||'').toLowerCase().includes(q)||String(o.x.id).includes(q));
   $('costos-n').textContent=`${costosTodos?'Costos de todos los pedidos':'Faltan costo'} (${l.length})`;
@@ -1189,7 +1189,7 @@ function pintarCostos(){
   $('costos-lista').innerHTML=l.map(({x,i})=>`<div class="pedido ${x.falta?'pend':'listo'}">
     <div class="ptop">
       <div style="flex:1;min-width:0">
-        <div class="pprod">${esc(x.producto)}${x.falta?'<span class="chip chip-pend">sin costo</span>':''}${x.envioIA?'<span class="chip chip-ia">envío lo puso la IA</span>':''}${x.importacion?'<span class="chip chip-pacho">importación</span>':''}</div>
+        <div class="pprod">${esc(x.producto)}${x.falta?'<span class="chip chip-pend">sin costo</span>':''}${x.envioIA?'<span class="chip chip-ia">envío que puso la IA</span>':''}${x.importacion?'<span class="chip chip-pacho">importación</span>':''}</div>
         <div class="pmeta">${esc(x.persona||'—')} · ${esc(x.ciudad||'sin ciudad')} · ${fFecha(x.fecha)} · #${esc(x.id)}</div>
       </div>
       <div class="pmoney"><b>${cop(x.venta)}</b>vendido</div>
@@ -1424,7 +1424,7 @@ function pintarRegistro(){
       <div style="flex:1;min-width:0">
         <div class="pprod">${esc(x.producto)}${dev?'<span class="chip chip-pend">devolución</span>':''}${x.importacion?'<span class="chip chip-pacho">importación</span>':''}</div>
         <div class="pmeta">${esc(x.nombre||'—')} · ${esc(x.cel||'sin celular')} · ${esc(x.ciudad||'sin ciudad')} · ${fFecha(x.fecha)} · #${esc(x.id)}</div>
-        <div class="pmeta">${esc(x.medioPago||'sin medio de pago')}${x.notas?' · '+esc(x.notas):''}${(()=>{ const c=ROL==='jp'&&regCosto(x); return !c?'':c.falta?' · <span class="chip chip-pend">sin costo</span>':c.envioIA?' · <span class="chip chip-ia">envío lo puso la IA</span>':''; })()}</div>
+        <div class="pmeta">${esc(x.medioPago||'sin medio de pago')}${x.notas?' · '+esc(x.notas):''}${(()=>{ const c=ROL==='jp'&&regCosto(x); return !c?'':c.falta?' · <span class="chip chip-pend">sin costo</span>':c.envioIA?' · <span class="chip chip-ia">envío que puso la IA</span>':''; })()}</div>
       </div>
       <div class="pmoney"><b>${cop(x.venta)}</b>vendido</div>
     </div>
