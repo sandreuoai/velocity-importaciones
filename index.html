@@ -948,7 +948,10 @@ const rotLugar = x => [x.ciudad,x.departamento].filter(Boolean).join(' — ');
 const rotFalta = x => ['persona','cedula','numero'].filter(k=>!x[k]).concat(rotLugar(x)?[]:['ciudad']).concat(x.producto?[]:['producto']);
 const rotItems = p => String(p||'').split('|').map(s=>s.trim()).filter(Boolean);
 const rotElegidos = () => rotulos.filter(x=>rotSel.has(x.id));
-const ROT_ESPERA=['POR REVISAR','POR PEDIR','EN CHINA','EN CAMINO'], ROT_LISTO=['POR DESPACHAR','PREPARANDO'], ROT_SALIO=['DESPACHADO','ENTREGADO'];
+// Sin pedir a Pacho (o sin revisar bodega) no va en Rótulos (2026-11-26): salía «para rotular» lo que Juan Pablo
+// acababa de mandar a Pedir a Pacho, e imprimirlo lo daba por llegado. Eso se maneja en Envíos y Pedir a Pacho.
+const ROT_SIN_PEDIR=['POR REVISAR','POR PEDIR'];
+const ROT_ESPERA=['EN CHINA','EN CAMINO'], ROT_LISTO=['POR DESPACHAR','PREPARANDO'], ROT_SALIO=['DESPACHADO','ENTREGADO'];
 // Búsqueda sin tildes ni mayúsculas; el celular y la cédula también se encuentran solo por dígitos.
 const rotNorm = t => String(t||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
 function rotCoincide(x,q){
@@ -966,7 +969,7 @@ async function cargarRotulos(){
   try{
     const r=await get({action:'rotulos',dias:$('rot-dias').value});
     if(r.error){ $('rot-lista').innerHTML=`<div class="vacio">${esc(r.error)}</div>`; rotulos=[]; rotSel=new Set(); rotResumen(); return; }
-    rotulos=r.pedidos||[];
+    rotulos=(r.pedidos||[]).filter(x=>!ROT_SIN_PEDIR.includes(x.estado));
     rotSel=new Set(rotulos.filter(rotPreseleccion).map(x=>x.id));
     pintarRotulos();
   }catch(e){ $('rot-lista').innerHTML='<div class="vacio">Error de conexión</div>'; }
@@ -1452,7 +1455,7 @@ function pintarRegistro(){
       </div>
       <div class="pmoney"><b>${cop(x.venta)}</b>vendido</div>
     </div>
-    ${regAbierta===x.id?regForm(x,i,dev):`<div class="bt"><button class="btn-fs" onclick="regAbrir(${i})">Corregir</button>${dev?'':`<button class="btn-fs" onclick="regDevolucion(${i})">Marcar devolución</button>`}<button class="btn-fs" onclick="regEliminar(${i})">Eliminar</button></div>`}
+    ${regAbierta===x.id?regForm(x,i,dev):`<div class="bt"><button class="btn-fs" onclick="regAbrir(${i})">Corregir</button>${x.archivada?'<span class="pmeta">Archivada: solo se corrige</span>':`${dev?'':`<button class="btn-fs" onclick="regDevolucion(${i})">Marcar devolución</button>`}<button class="btn-fs" onclick="regEliminar(${i})">Eliminar</button>`}</div>`}
   </div>`;}).join('')+(l.length>150?`<div class="vacio">Hay ${l.length-150} más: búscala por nombre, celular o #.</div>`:'');
 }
 // Costos en Registro (Andreu, 2026-11-24): «Corregir» también carga o edita inversión y envío, con la misma regla y
