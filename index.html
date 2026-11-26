@@ -100,6 +100,7 @@ main{padding:14px 16px 24px;max-width:1300px;margin:0 auto}
 .chip{font-size:11px;font-weight:600;padding:2px 8px;border-radius:5px;display:inline-block;margin:2px 0 2px 6px}
 .chip-pend{background:rgba(245,158,11,.12);color:#fbbf24;border:1px solid rgba(245,158,11,.28)}
 .chip-ok{background:rgba(34,197,94,.12);color:#4ade80;border:1px solid rgba(34,197,94,.25)}
+.chip-ia{background:rgba(42,120,214,.14);color:#7cb4f5;border:1px solid rgba(42,120,214,.35)}
 .chip-pacho{background:rgba(192,132,252,.12);color:#c084fc;border:1px solid rgba(192,132,252,.28)}
 .vacio{text-align:center;padding:44px 16px;color:var(--muted);font-size:15px;line-height:1.5}
 .vacio .big{font-size:36px;margin-bottom:10px}
@@ -292,10 +293,8 @@ button,a,label,select,input,textarea,.tab,.ficha{touch-action:manipulation}
       <button class="tab active" onclick="ir('envios',this)">Envíos</button>
       <button class="tab" onclick="ir('pedir',this)">Pedir a Pacho</button>
       <button class="tab" onclick="ir('rotulos',this)">Rótulos</button>
-      <button class="tab" onclick="ir('registro',this)">Registro de ventas</button>
-      <button class="tab solo-jp" id="tab-costos" onclick="ir('costos',this)">Costos</button>
-      <button class="tab solo-jp" onclick="ir('deuda',this)">Deuda</button>
-      <button class="tab solo-jp" onclick="ir('ventas',this)">Ventas</button>
+      <button class="tab" id="tab-ventas" onclick="ir('registro',this)">Ventas</button>
+      <button class="tab solo-jp" onclick="ir('metricas',this)">Métricas</button>
     </div>
 
     <div class="page active" id="pg-envios">
@@ -362,7 +361,19 @@ button,a,label,select,input,textarea,.tab,.ficha{touch-action:manipulation}
     </div>
 
     <div class="page" id="pg-registro">
-      <div class="aviso">Las ventas que entraron (Manuel, asesores y la página). Corrige lo que quedó mal, marca una devolución o elimina una venta que no fue. Lo que cambies llega solo al panel de Andreu.</div>
+      <div class="solo-jp" id="reg-costos">
+        <div class="cards" id="c-costos"></div>
+        <div class="hdr">
+          <span class="t" id="costos-n">Faltan costo</span>
+          <div class="acc">
+            <input type="search" class="search" id="costos-q" placeholder="Buscar cliente o producto..." oninput="pintarCostos()"/>
+            <button class="btn-fs" id="b-costos-todos" onclick="costosToggle()">Ver todos los costos</button>
+          </div>
+        </div>
+        <p class="pista" id="costos-pista">Pon lo que pagaste por la prenda y lo que costó traerla. Con las dos, el pedido entra a tu saldo</p>
+        <div id="costos-lista"></div>
+      </div>
+      <div class="aviso">Todas las ventas: Manuel, asesores y la página. Corrige lo que quedó mal, marca una devolución o borra una venta que no fue. Lo que cambies le llega solo al panel de Andreu</div>
       <div class="hdr">
         <span class="t" id="reg-n">Ventas</span>
         <div class="acc">
@@ -374,36 +385,8 @@ button,a,label,select,input,textarea,.tab,.ficha{touch-action:manipulation}
       <div id="reg-lista"><div class="loading">Cargando...</div></div>
     </div>
 
-    <div class="page" id="pg-costos">
-      <div class="cards" id="c-costos"><div class="loading">Cargando...</div></div>
-      <div class="aviso">Aquí cargas lo que pagaste por cada prenda (<b>inversión</b>) y lo que costó traerla (<b>envío</b>). Hay que poner <b>las dos</b>. Lo que guardes llega solo al panel de Andreu la próxima vez que se sincroniza, y de ahí sube tu saldo.</div>
-      <div class="hdr">
-        <span class="t" id="costos-n">Costos</span>
-        <div class="acc">
-          <input type="search" class="search" id="costos-q" placeholder="Buscar cliente o producto..." oninput="pintarCostos()"/>
-          <button class="btn-fs" id="b-costos-todos" onclick="costosToggle()">Ver todos</button>
-          <button class="btn-fs" onclick="cargarCostos()">Actualizar</button>
-        </div>
-      </div>
-      <div id="costos-lista"><div class="loading">Cargando...</div></div>
-    </div>
-
-    <div class="page" id="pg-deuda">
+    <div class="page" id="pg-metricas">
       <div class="cards" id="c-deuda"><div class="loading">Cargando...</div></div>
-      <div id="aviso-deuda"></div>
-      <div class="row2">
-        <div class="chart-card" style="margin:0">
-          <div class="ct">Costo por mes</div>
-          <ul class="rk" id="rk-meses"><li class="loading" style="padding:20px 0">Cargando...</li></ul>
-        </div>
-        <div class="chart-card" style="margin:0">
-          <div class="ct">Abonos recibidos</div>
-          <ul class="rk" id="rk-abonos"><li class="loading" style="padding:20px 0">Cargando...</li></ul>
-        </div>
-      </div>
-    </div>
-
-    <div class="page" id="pg-ventas">
       <div class="filtros">
         <label>Desde</label><input type="date" class="fi" id="d1"/>
         <label>Hasta</label><input type="date" class="fi" id="d2"/>
@@ -419,17 +402,23 @@ button,a,label,select,input,textarea,.tab,.ficha{touch-action:manipulation}
       </div>
       <div class="row2">
         <div class="chart-card" style="margin:0">
-          <div class="ct">Canal de venta</div>
+          <div class="ct">Canal</div>
           <div style="position:relative;height:200px"><canvas id="ch-canal"></canvas></div>
         </div>
         <div class="chart-card" style="margin:0">
-          <div class="ct">Importación vs nacional</div>
-          <ul class="rk" id="rk-tipo"><li class="loading" style="padding:20px 0">Cargando...</li></ul>
+          <div class="ct">País</div>
+          <ul class="rk" id="rk-pais"><li class="loading" style="padding:20px 0">Cargando...</li></ul>
         </div>
       </div>
-      <div class="chart-card">
-        <div class="ct">Ciudades con más pedidos</div>
-        <ul class="rk" id="rk-ciudad"><li class="loading" style="padding:20px 0">Cargando...</li></ul>
+      <div class="row2">
+        <div class="chart-card" style="margin:0">
+          <div class="ct">Top 5 clientes</div>
+          <ul class="rk" id="rk-clientes"><li class="loading" style="padding:20px 0">Cargando...</li></ul>
+        </div>
+        <div class="chart-card" style="margin:0">
+          <div class="ct">Top 5 productos</div>
+          <ul class="rk" id="rk-productos"><li class="loading" style="padding:20px 0">Cargando...</li></ul>
+        </div>
       </div>
     </div>
   </main>
@@ -451,6 +440,8 @@ const $ = id => document.getElementById(id);
 const cop = v => '$' + Math.round(v||0).toLocaleString('es-CO');
 // Sheets convierte «6/10» en fecha y el servidor la manda como «Tue Oct 06 2026 00:00:00 GMT-0500…»: se muestra «6/10/2026».
 const obsTxt = v => { const m=String(v||'').match(/^\w{3} (\w{3}) (\d{2}) (\d{4}) \d{2}:\d{2}:\d{2} GMT/); if(!m) return String(v||''); const k=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'].indexOf(m[1]); return k<0?String(v):`${parseInt(m[2])}/${k+1}/${m[3]}`; };
+// Plural de persona, no «pedido(s)» (Andreu, 2026-11-26).
+const pl=(n,uno,varios)=>n+' '+(n===1?uno:(varios||uno+'s'));
 const esc = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 const MES=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
 function fFecha(iso){ if(!iso) return '—'; const [y,m,d]=iso.split('-'); return `${parseInt(d)} ${MES[parseInt(m)-1]}`; }
@@ -547,7 +538,7 @@ function salir(){ U=P=''; envios=[]; envCargadoEl=0; envFaltan=undefined; $('app
 let pgActual='envios';
 async function actualizarActual(){
   const b=$('b-act'); b.disabled=true; b.style.opacity='.5';
-  const f={envios:()=>cargarEnvios({forzar:true}),pedir:cargarPedir,rotulos:cargarRotulos,costos:cargarCostos,deuda:cargarDeuda,ventas:cargarVentas}[pgActual];
+  const f={envios:()=>cargarEnvios({forzar:true}),pedir:cargarPedir,rotulos:cargarRotulos,registro:()=>Promise.all([cargarRegistro(),ROL==='jp'&&cargarCostos()]),metricas:()=>Promise.all([cargarDeuda(),cargarVentas()])}[pgActual];
   try{ await f(); toast('Actualizado'); }catch(e){ toast('No se pudo actualizar','err'); }
   b.disabled=false; b.style.opacity='';
 }
@@ -559,10 +550,8 @@ function ir(pg,btn){
   if(pg==='envios') cargarEnvios();
   if(pg==='pedir') cargarPedir();
   if(pg==='rotulos') cargarRotulos();
-  if(pg==='costos') cargarCostos();
-  if(pg==='deuda') cargarDeuda();
-  if(pg==='registro') cargarRegistro();
-  if(pg==='ventas' && !$('d1').value){ rangoMes(0); }
+  if(pg==='registro'){ cargarRegistro(); if(ROL==='jp') cargarCostos(); }
+  if(pg==='metricas'){ cargarDeuda(); if(!$('d1').value) rangoMes(0); }
 }
 
 // ============================================================
@@ -580,7 +569,7 @@ function pintarPendientes(){
   const o=pendLeer();
   if(ROL==='jp'&&typeof envFaltan==='number') faltanCosto=envFaltan;
   const items=[
-    {k:'costos',n:ROL==='jp'?faltanCosto:0,txt:`<b>${faltanCosto} pedido${faltanCosto===1?'':'s'} sin costo cargado.</b> Mientras falte la inversión y el envío, ese dinero no sube en tu saldo.`,go:'Cargar costos',fn:"ir('costos',$('tab-costos'));window.scrollTo(0,0)"},
+    {k:'costos',n:ROL==='jp'?faltanCosto:0,txt:`<b>${faltanCosto} pedido${faltanCosto===1?'':'s'} sin costo cargado.</b> Mientras falte la inversión y el envío, ese dinero no sube en tu saldo.`,go:'Cargar costos',fn:"ir('registro',$('tab-ventas'));window.scrollTo(0,0)"},
     {k:'prueba-imp',n:1,fijo:true,txt:'<b>Prueba la impresión una vez con papel real:</b> 1 rótulo y luego 8. Mira que el borde punteado salga completo y que nada se corte.'}
   ].filter(i=>{
     if(!i.n) return false;
@@ -589,7 +578,7 @@ function pintarPendientes(){
     return h.dia!==hoy();                       // cerrado: solo por hoy
   });
   $('pendientes').innerHTML=items.length?`<details class="pend-d" ${items.length<=2||o._abierto!==false?'open':''}><summary class="pend-t">Pendientes para ti (${items.length}) <span style="text-transform:none">· toca para ${'abrir o cerrar'}</span></summary>`+items.map(i=>`<div class="pend"><span>${i.txt}</span><div class="bt">${i.go?`<button class="go" onclick="${i.fn}">${i.go}</button>`:''}<button class="ok" onclick="pendOcultar('${i.k}','hecho',${i.n})">✓ Hecho</button><button onclick="pendOcultar('${i.k}','cerrar',${i.n})" aria-label="Cerrar por hoy">Cerrar</button></div></div>`).join('')+'</details>':'';
-  $('tab-costos').innerHTML='Costos'+(faltanCosto?`<span class="nbadge">${faltanCosto}</span>`:'');
+  $('tab-ventas').innerHTML='Ventas'+(faltanCosto?`<span class="nbadge">${faltanCosto}</span>`:'');
 }
 async function avisoCostos(){
   try{
@@ -1002,7 +991,7 @@ function pintarRotulos(){
     <div class="card"><div class="lbl">Datos incompletos</div><div class="val ${inc?'red':'green'}">${inc}</div><div class="sub">${inc?'No se pueden imprimir':'Todo completo'}</div></div>
     <div class="card"><div class="lbl">Despachados</div><div class="val green">${des.length}</div><div class="sub">En este período</div></div>`;
   $('rot-n').textContent=`Rótulos (${por.length} para despachar)`;
-  $('rot-aviso').innerHTML=inc?`<div class="aviso"><b>${inc} pedido(s) con datos incompletos</b> (en rojo). Corrige el dato en el registro de Despachos y recarga: aquí no se inventa.</div>`:'';
+  $('rot-aviso').innerHTML=inc?`<div class="aviso"><b>${inc===1?'A 1 pedido le faltan datos':`A ${inc} pedidos les faltan datos`}</b> (en rojo). Corrígelos en Despachos y dale Actualizar</div>`:'';
   const q=rotQ(), f=l=>l.filter(x=>rotCoincide(x,q));
   const grupo=(t,l)=>l.length?`<div class="ct" style="margin:16px 0 8px">${t} (${l.length})</div>`+l.map(rotFila).join(''):'';
   const html=grupo('Para despachar',f(por))+grupo('Importación en camino — cuando llegue, imprime su rótulo',f(cam))+(rotVerDesp?grupo('Despachados',f(des)):'');
@@ -1023,7 +1012,7 @@ function rotResumen(){
   const n=rotSel.size;
   const vac=(8-n%8)%8;
   const q=rotQ(), ocultos=q?rotulos.filter(x=>rotSel.has(x.id)&&!rotCoincide(x,q)).length:0;
-  $('rot-resumen').innerHTML=n?`${n} marcado(s)`+(ocultos?` <b style="color:var(--amber)">(${ocultos} fuera de la búsqueda)</b>`:'')+` · ${Math.ceil(n/8)} hoja(s) carta`+(vac?` · <b style="color:var(--amber)">la última hoja queda con ${vac} espacio(s) vacío(s)</b>`:' · hojas completas ✓'):'Marca los pedidos con los que vas a trabajar';
+  $('rot-resumen').innerHTML=n?pl(n,'marcado')+(ocultos?` <b style="color:var(--amber)">(${ocultos} fuera de la búsqueda)</b>`:'')+` · ${pl(Math.ceil(n/8),'hoja')} carta`+(vac?` · <b style="color:var(--amber)">la última hoja queda con ${pl(vac,'espacio vacío','espacios vacíos')}</b>`:' · hojas completas ✓'):'Marca los pedidos con los que vas a trabajar';
   $('rot-btn').disabled=!n;
 }
 
@@ -1038,9 +1027,9 @@ async function rotCambiar(estado){
   if(!ids.length){ toast(estado==='ENTREGADO'?'Eso ya está entregado':'Solo se reabre lo despachado. Lo que viene en camino se libera al imprimir su rótulo.','err'); return; }
   let pregunta;
   if(estado==='ENTREGADO'){
-    pregunta=`¿Marcar ${ids.length} pedido(s) como ENTREGADOS?\n\nEs para cerrar pedidos que ya llegaron antes de la pestaña Envíos. No se le avisa nada al cliente ni a Shopify.`;
+    pregunta=`¿Marcar ${pl(ids.length,'pedido')} como entregado${ids.length===1?'':'s'}?\n\nEs para cerrar pedidos que ya llegaron antes de la pestaña Envíos. No se le avisa nada al cliente ni a Shopify.`;
   }else{
-    pregunta=`¿Reabrir ${ids.length} pedido(s)? Vuelven a «Para despachar». En Shopify no se deshace nada.`;
+    pregunta=`¿Reabrir ${pl(ids.length,'pedido')}? Vuelven a «Para despachar». En Shopify no se deshace nada.`;
   }
   if(!confirm(pregunta)) return;
   rotBusy=true;
@@ -1048,7 +1037,7 @@ async function rotCambiar(estado){
     const r=await post({action:'rot_estado',ids:ids.map(x=>x.id),estado});
     if(r.error){ toast(r.error,'err'); return; }
     const w=r.whatsapp||{enviados:0,fallaron:[]};
-    toast(`${r.cambiados} pedido(s) actualizados`+(w.enviados?` · ${w.enviados} WhatsApp enviados`:'')+(w.fallaron.length?` · ${w.fallaron.length} sin WhatsApp: míralos en Envíos`:''), w.fallaron.length?'err':'ok');
+    toast(`${pl(r.cambiados,'pedido actualizado','pedidos actualizados')}`+(w.enviados?` · ${w.enviados} WhatsApp enviados`:'')+(w.fallaron.length?` · ${w.fallaron.length} sin WhatsApp: míralos en Envíos`:''), w.fallaron.length?'err':'ok');
   }catch(e){ toast('No se pudo guardar: '+errTxt(e),'err'); return; }
   finally{ rotBusy=false; }
   await cargarRotulos();
@@ -1069,7 +1058,7 @@ function rotulosHTML(lista){
       <div class="campo"><small>Celular</small><span class="cel">${esc(x.numero)}</span></div></div>
       <div class="campo"><small>Dirección</small><span>${esc(x.direccion||'')}</span></div>
       <div class="campo"><small>Ciudad — Departamento</small><span>${esc(rotLugar(x))}</span></div>
-      <div class="campo"><small>Producto</small><ul class="${it.length>2?'chico':''}">${it.slice(0,ROT_MAX).map(p=>`<li>${esc(p)}</li>`).join('')}${it.length>ROT_MAX?`<li class="rot-mas">+ ${it.length-ROT_MAX} producto(s) más · ver pedido #${esc(x.id)}</li>`:''}</ul></div>
+      <div class="campo"><small>Producto</small><ul class="${it.length>2?'chico':''}">${it.slice(0,ROT_MAX).map(p=>`<li>${esc(p)}</li>`).join('')}${it.length>ROT_MAX?`<li class="rot-mas">+ ${pl(it.length-ROT_MAX,'producto')} más · ver pedido #${esc(x.id)}</li>`:''}</ul></div>
     </div>`;
   };
   let h='';
@@ -1088,7 +1077,7 @@ function rotImprimir(){
   if(l.some(x=>rotFalta(x).length)){ toast('Hay rótulos con datos incompletos. Desmárcalos o corrígelos.','err'); return; }
   const vac=(8-l.length%8)%8;
   const cam=l.filter(x=>ROT_ESPERA.includes(x.estado)).length;
-  const aviso=`Vas a imprimir ${l.length} rótulo(s) en ${Math.ceil(l.length/8)} hoja(s) carta.`+(cam?`\n\n${cam} figura(n) todavía en camino: al confirmar que salieron bien quedan «Para despachar» y a cada cliente le llega el WhatsApp de que su pedido ya está en bodega.`:'')+(vac?`\n\nOJO: la última hoja saldrá con ${vac} espacio(s) vacío(s). ${l.length===1?'Si tienes más pedidos listos, márcalos para aprovechar la hoja.':'¿Seguro que no faltan pedidos por marcar?'}`:'')+`\n\nEn la ventana de impresión: tamaño Carta, escala 100% y márgenes «Ninguno».`;
+  const aviso=`Vas a imprimir ${pl(l.length,'rótulo')} en ${pl(Math.ceil(l.length/8),'hoja')} carta.`+(cam?`\n\n${cam} ${cam===1?'figura':'figuran'} todavía en camino: al confirmar que salieron bien quedan «Para despachar» y a cada cliente le llega el WhatsApp de que su pedido ya está en bodega.`:'')+(vac?`\n\nOJO: la última hoja saldrá con ${pl(vac,'espacio vacío','espacios vacíos')}. ${l.length===1?'Si tienes más pedidos listos, márcalos para aprovechar la hoja.':'¿Seguro que no faltan pedidos por marcar?'}`:'')+`\n\nEn la ventana de impresión: tamaño Carta, escala 100% y márgenes «Ninguno».`;
   if(!confirm(aviso)) return;
   const rep=l.filter(x=>x.impresiones>0);
   if(rep.length){
@@ -1144,7 +1133,7 @@ function rotPintarConfirma(){
       ?`<div style="color:var(--muted);font-size:13px">El celular sí abrió la ventana de impresión. Si no salió papel, el problema es la impresora: que esté prendida, con papel y en el mismo wifi del celular, y elígela en esa ventana<br><small>${esc(det)}</small></div>`
       :`<div style="color:#f87171"><b>El celular no abrió la ventana de impresión: no se imprimió nada</b><br>${esc(rotAyuda(d))}. Luego toca «Salió mal» e imprime otra vez<br><small style="color:var(--muted)">${esc(det)}</small></div>`;
   }
-  $('rot-confirma').innerHTML=l?`<div class="pend"><span><b>¿Salieron bien los ${l.length} rótulo(s)?</b> Si sí, quedan contados como impresos para todos. Si algo salió mal, toca «Salió mal» e imprime otra vez.</span>${diag}<div class="bt"><button class="ok" onclick="rotConfirmar(true)">Sí, salieron bien</button><button onclick="rotConfirmar(false)">Salió mal</button></div></div>`:'';
+  $('rot-confirma').innerHTML=l?`<div class="pend"><span><b>¿${l.length===1?'Salió bien el rótulo':`Salieron bien los ${l.length} rótulos`}?</b> Si sí, quedan contados como impresos para todos. Si algo salió mal, toca «Salió mal» e imprime otra vez.</span>${diag}<div class="bt"><button class="ok" onclick="rotConfirmar(true)">Sí, salieron bien</button><button onclick="rotConfirmar(false)">Salió mal</button></div></div>`:'';
 }
 async function rotConfirmar(ok){
   const l=rotPendiente; rotPendiente=null; rotPintarConfirma();
@@ -1159,7 +1148,7 @@ async function rotConfirmar(ok){
     if(cam.length){
       const e=await post({action:'rot_estado',ids:cam.map(x=>x.id),estado:'POR DESPACHAR'});
       if(e.error) toast('Impresos, pero no pude dejarlos «Para despachar»: '+e.error,'err');
-      else{ const w=e.whatsapp||{enviados:0,fallaron:[]}; toast(`${e.cambiados} pedido(s) para despachar`+(w.enviados?` · ${w.enviados} WhatsApp enviados`:'')+(w.fallaron.length?` · ${w.fallaron.length} sin WhatsApp: míralos en Envíos`:''), w.fallaron.length?'err':'ok'); }
+      else{ const w=e.whatsapp||{enviados:0,fallaron:[]}; toast(`${pl(e.cambiados,'pedido')} para despachar`+(w.enviados?` · ${w.enviados} WhatsApp enviados`:'')+(w.fallaron.length?` · ${w.fallaron.length} sin WhatsApp: míralos en Envíos`:''), w.fallaron.length?'err':'ok'); }
     }
   }catch(e){ toast('No se pudo registrar la impresión: '+errTxt(e),'err'); }
   finally{ rotBusy=false; }
@@ -1177,28 +1166,30 @@ async function cargarCostos(){
   try{
     const r=await get({action:'costos'});
     if(r.error){ $('costos-lista').innerHTML=`<div class="vacio">${esc(r.error)}</div>`; costos=[]; return; }
-    costos=r.pedidos||[];
-    pintarCostos();
+    costos=r.pedidos||[]; costosContar();
+    pintarCostos(); if(ventasReg.length) pintarRegistro();
   }catch(e){ $('costos-lista').innerHTML='<div class="vacio">Error de conexión</div>'; }
 }
-function costosToggle(){ costosTodos=!costosTodos; $('b-costos-todos').textContent=costosTodos?'Ver solo los que faltan':'Ver todos'; pintarCostos(); }
+function costosToggle(){ costosTodos=!costosTodos; $('b-costos-todos').textContent=costosTodos?'Ver solo los que faltan':'Ver todos los costos'; pintarCostos(); }
 
 function pintarCostos(){
   const q=($('costos-q').value||'').toLowerCase();
   const faltan=costos.filter(x=>x.falta);
-  const sinCosto=faltan.reduce((s,x)=>s+(x.venta||0),0);
+  const sinCosto=faltan.reduce((s,x)=>s+(x.venta||0),0), nIA=costos.filter(x=>x.envioIA).length;
+  // Arriba de Ventas (Andreu, 2026-11-26): lo que falta de costo y los envíos que puso la IA, para revisarlos.
   $('c-costos').innerHTML=`
-    <div class="card"><div class="lbl">Sin costo cargado</div><div class="val ${faltan.length?'amber':'green'}">${faltan.length}</div><div class="sub">${faltan.length?'Faltan inversión y/o envío':'Todo cargado'}</div></div>
-    <div class="card"><div class="lbl">Vendido sin costo</div><div class="val">${cop(sinCosto)}</div><div class="sub">De esos pedidos</div></div>
-    <div class="card"><div class="lbl">Pedidos en Despachos</div><div class="val">${costos.length}</div><div class="sub">Con y sin costo</div></div>`;
+    <div class="card"><div class="lbl">Sin costo</div><div class="val ${faltan.length?'amber':'green'}">${faltan.length}</div><div class="sub">${faltan.length?'Pedidos sin inversión o envío':'Todo cargado'}</div></div>
+    ${faltan.length?`<div class="card"><div class="lbl">Vendido sin costo</div><div class="val">${cop(sinCosto)}</div><div class="sub">No suma a tu saldo todavía</div></div>`:''}
+    ${nIA?`<div class="card"><div class="lbl">Envío lo puso la IA</div><div class="val" style="color:#7cb4f5">${nIA}</div><div class="sub">Revisa que el valor esté bien</div></div>`:''}`;
   let l=costos.map((x,i)=>({x,i})).filter(o=>costosTodos||o.x.falta);
   if(q) l=l.filter(o=>(o.x.persona||'').toLowerCase().includes(q)||(o.x.producto||'').toLowerCase().includes(q)||String(o.x.id).includes(q));
-  $('costos-n').textContent=`${costosTodos?'Todos los pedidos':'Faltan costo'} (${l.length})`;
-  if(!l.length){ $('costos-lista').innerHTML=`<div class="vacio"><div class="big">✅</div><div>${costos.length?'No hay pedidos con ese filtro.':'No hay pedidos.'}</div></div>`; return; }
+  $('costos-n').textContent=`${costosTodos?'Costos de todos los pedidos':'Faltan costo'} (${l.length})`;
+  $('costos-pista').hidden=!l.length;
+  if(!l.length){ $('costos-lista').innerHTML=`<div class="pmeta" style="margin:0 0 16px">${costosTodos||q?'Nada con esa búsqueda':'Todos los pedidos tienen su costo'}</div>`; return; }
   $('costos-lista').innerHTML=l.map(({x,i})=>`<div class="pedido ${x.falta?'pend':'listo'}">
     <div class="ptop">
       <div style="flex:1;min-width:0">
-        <div class="pprod">${esc(x.producto)}${x.falta?'<span class="chip chip-pend">sin costo</span>':''}${x.importacion?'<span class="chip chip-pacho">importación</span>':''}</div>
+        <div class="pprod">${esc(x.producto)}${x.falta?'<span class="chip chip-pend">sin costo</span>':''}${x.envioIA?'<span class="chip chip-ia">envío lo puso la IA</span>':''}${x.importacion?'<span class="chip chip-pacho">importación</span>':''}</div>
         <div class="pmeta">${esc(x.persona||'—')} · ${esc(x.ciudad||'sin ciudad')} · ${fFecha(x.fecha)} · #${esc(x.id)}</div>
       </div>
       <div class="pmoney"><b>${cop(x.venta)}</b>vendido</div>
@@ -1399,27 +1390,9 @@ async function cargarDeuda(){
       <div class="card"><div class="lbl">Costo operacional del período</div><div class="val">${cop(r.causada)}</div><div class="sub">${r.liquidadas} pedidos liquidados desde el 1 Jul</div></div>
       <div class="card"><div class="lbl">Abonos que has recibido</div><div class="val green">${cop(r.abonos)}</div><div class="sub">${r.listaAbonos.length} abonos</div></div>
       ${r.contraentregas?`<div class="card"><div class="lbl">Contraentregas</div><div class="val green">${cop(r.contraentregas)}</div><div class="sub">${r.nContraentrega} ventas que cobraste directo: abonan solas</div></div>`:''}
-      <div class="card"><div class="lbl">Por liquidar</div><div class="val ${r.pendientes?'amber':'green'}">${r.pendientes}</div><div class="sub">${r.pendientes?'Pedidos sin costo cargado: el saldo va a subir':'Todo liquidado'}</div></div>`;
+      <div class="card"><div class="lbl">Por liquidar</div><div class="val ${r.pendientes?'amber':'green'}">${r.pendientes}</div><div class="sub">${r.pendientes?`Sin costo: al cargarlos el saldo sube unos ${cop(r.porLlegar)}`:'Todo liquidado'}</div></div>`;
 
-    $('aviso-deuda').innerHTML = r.pendientes
-      ? `<div class="aviso">Tienes <b>${r.pendientes} pedidos sin costo cargado</b> (${cop(r.ventaPendiente)} vendidos). Mientras no les pongas precio de compra y envío, ese costo no aparece en tu saldo. Al cargarlos, el saldo sube unos <b>${cop(r.porLlegar)}</b>.</div>`
-      : '';
 
-    const mx=Math.max(...(r.meses||[]).map(m=>m.costo),1);
-    $('rk-meses').innerHTML=(r.meses||[]).length ? r.meses.slice().reverse().map(m=>{
-      const[y,mm]=m.mes.split('-');
-      return `<li class="rki"><span class="rkn"></span>
-        <span class="rkname">${MES[parseInt(mm)-1]} ${y} <span style="color:var(--muted);font-size:11px">${m.pendientes?m.pendientes+' sin cargar':'completo'}</span></span>
-        <div class="rkbw"><div class="rkb" style="width:${Math.round(m.costo/mx*100)}%"></div></div>
-        <span class="rkv">${cop(m.costo)}</span></li>`;}).join('')
-      : '<li style="padding:16px 0;color:var(--muted);font-size:12px;text-align:center">Sin datos</li>';
-
-    const ma=Math.max(...(r.listaAbonos||[]).map(a=>a.valor),1);
-    $('rk-abonos').innerHTML=(r.listaAbonos||[]).length ? r.listaAbonos.map(a=>
-      `<li class="rki"><span class="rkn"></span><span class="rkname">${fFecha(a.fecha)}</span>
-        <div class="rkbw"><div class="rkb" style="width:${Math.round(a.valor/ma*100)}%;background:#22c55e"></div></div>
-        <span class="rkv" style="color:var(--green)">${cop(a.valor)}</span></li>`).join('')
-      : '<li style="padding:16px 0;color:var(--muted);font-size:12px;text-align:center">Sin abonos todavía</li>';
   }catch(e){ $('c-deuda').innerHTML='<div class="loading">Error de conexión</div>'; }
 }
 
@@ -1451,7 +1424,7 @@ function pintarRegistro(){
       <div style="flex:1;min-width:0">
         <div class="pprod">${esc(x.producto)}${dev?'<span class="chip chip-pend">devolución</span>':''}${x.importacion?'<span class="chip chip-pacho">importación</span>':''}</div>
         <div class="pmeta">${esc(x.nombre||'—')} · ${esc(x.cel||'sin celular')} · ${esc(x.ciudad||'sin ciudad')} · ${fFecha(x.fecha)} · #${esc(x.id)}</div>
-        <div class="pmeta">${esc(x.medioPago||'sin medio de pago')}${x.notas?' · '+esc(x.notas):''}</div>
+        <div class="pmeta">${esc(x.medioPago||'sin medio de pago')}${x.notas?' · '+esc(x.notas):''}${(()=>{ const c=ROL==='jp'&&regCosto(x); return !c?'':c.falta?' · <span class="chip chip-pend">sin costo</span>':c.envioIA?' · <span class="chip chip-ia">envío lo puso la IA</span>':''; })()}</div>
       </div>
       <div class="pmoney"><b>${cop(x.venta)}</b>vendido</div>
     </div>
@@ -1470,7 +1443,7 @@ function regForm(x,i){
     ${k==='producto'||k==='notas'?`<textarea class="obs" id="rg-${k}" rows="2">${esc(x[k])}</textarea>`
       :`<input class="obs" id="rg-${k}" ${k==='venta'?'data-cop ':''}${k==='venta'||k==='cel'||k==='cedula'?'inputmode="numeric"':''} value="${esc(k==='venta'?(x.venta||''):x[k])}">`}</label>`).join('')}
     ${ROL!=='jp'?'':(()=>{ const c=regCosto(x); return c?`<label class="chk" style="flex-direction:column;align-items:stretch;gap:4px;min-height:0">Inversión<input class="obs" id="rg-inv" data-cop inputmode="numeric" value="${c.inversion||''}" placeholder="$ 0"></label><label class="chk" style="flex-direction:column;align-items:stretch;gap:4px;min-height:0">Envío<input class="obs" id="rg-env" data-cop inputmode="numeric" value="${c.envio||''}" placeholder="$ 0"></label>`
-      :`<div class="pmeta" style="flex-basis:100%">${costos.length?'Este pedido no está en Costos: su costo se carga allá cuando aparezca':'Cargando el costo...'}</div>`; })()}
+      :`<div class="pmeta" style="flex-basis:100%">${costos.length?'Este pedido ya no pide costo (devolución o archivado)':'Cargando el costo...'}</div>`; })()}
     <div class="bt"><button class="btn-ok" onclick="regGuardar(${i})">Guardar</button><button class="btn-fs" onclick="regAbierta=null;pintarRegistro()">Cancelar</button></div></div>`;
 }
 function regGuardar(i){
@@ -1524,13 +1497,10 @@ async function cargarVentas(){
   try{
     const r=await get({action:'resumen',desde,hasta});
     if(r.error){ $('c-ventas').innerHTML=`<div class="loading">${esc(r.error)}</div>`; return; }
-    const imp=(r.tipos||[]).find(t=>t.tipo==='SI');
-    const pctImp=r.totalVentas?Math.round((imp?imp.ventas:0)/r.totalVentas*100):0;
     $('c-ventas').innerHTML=`
       <div class="card"><div class="lbl">Ventas del período</div><div class="val">${cop(r.totalVentas)}</div></div>
       <div class="card"><div class="lbl">Pedidos</div><div class="val">${r.ordenes}</div></div>
-      <div class="card"><div class="lbl">Ticket promedio</div><div class="val">${cop(r.ticket)}</div></div>
-      <div class="card"><div class="lbl">Importación</div><div class="val" style="color:#c084fc">${pctImp}%</div><div class="sub">${imp?imp.ordenes+' pedidos · '+cop(imp.ventas):'sin marcar'}</div></div>`;
+      <div class="card"><div class="lbl">Ticket promedio</div><div class="val">${cop(r.ticket)}</div></div>`;
 
     destroy('dias');
     const d=r.dias||[];
@@ -1546,15 +1516,17 @@ async function cargarVentas(){
       data:{labels:cs.map(x=>x.canal),datasets:[{data:cs.map(x=>x.ordenes),backgroundColor:cs.map((_,i)=>pal[i%pal.length]),borderWidth:0}]},
       options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{color:'#666',font:{size:11},boxWidth:10,padding:10}}}}});
 
-    const et={'SI':'Importación','NO':'Nacional'};
-    rank('rk-tipo',(r.tipos||[]),x=>et[x.tipo]||x.tipo,x=>`${x.ordenes} · ${cop(x.ventas)}`,x=>x.ventas,'#c084fc');
-    rank('rk-ciudad',(r.ciudades||[]),x=>x.ciudad,x=>`${x.ordenes} pedidos`,x=>x.ordenes,'#22c55e');
+    // País, top 5 clientes y productos: con un servidor viejo no llegan y se dice, no se deja «Cargando».
+    const viejo=!r.paises;
+    rank('rk-pais',(r.paises||[]),x=>x.pais,x=>`${x.ordenes} · ${cop(x.ventas)}`,x=>x.ventas,'#22c55e',viejo);
+    rank('rk-clientes',(r.clientes||[]),x=>x.nombre,x=>`${x.ordenes} · ${cop(x.ventas)}`,x=>x.ventas,'#eda100',viejo);
+    rank('rk-productos',(r.productos||[]),x=>x.producto,x=>`${x.unidades} und.`,x=>x.unidades,'#c084fc',viejo);
   }catch(e){ $('c-ventas').innerHTML='<div class="loading">Error de conexión</div>'; }
 }
 
-function rank(el,items,nf,vf,sf,color){
+function rank(el,items,nf,vf,sf,color,viejo){
   const n=$(el);
-  if(!items.length){ n.innerHTML='<li style="padding:16px 0;color:var(--muted);font-size:12px;text-align:center">Sin datos</li>'; return; }
+  if(!items.length){ n.innerHTML=`<li style="padding:16px 0;color:var(--muted);font-size:12px;text-align:center">${viejo?'Falta actualizar el servidor':'Sin ventas en esas fechas'}</li>`; return; }
   const max=Math.max(...items.map(sf),1);
   n.innerHTML=items.slice(0,10).map((x,i)=>`<li class="rki">
     <span class="rkn">${i+1}</span>
