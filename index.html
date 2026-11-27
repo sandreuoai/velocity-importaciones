@@ -438,6 +438,10 @@ let ch={};
 
 const $ = id => document.getElementById(id);
 const cop = v => '$' + Math.round(v||0).toLocaleString('es-CO');
+// Venta de afuera por PayPal (2026-11-27, #1371 decía «$105 vendido» y eran dólares): el servidor manda x.usd.
+const usdTxt = v => 'US$' + Number(v||0).toLocaleString('es-CO',{minimumFractionDigits:v%1?2:0,maximumFractionDigits:2});
+const ventaB = x => x.usd ? usdTxt(x.usd.usd) : cop(x.venta);
+const ventaUsdLinea = x => !x.usd ? '' : `<div class="pmeta">${usdTxt(x.usd.usd)} · PayPal cobra ${usdTxt(x.usd.cobraUsd)} · nos deja <b>${cop(x.usd.neto)}</b> (TRM ${Number(x.usd.trm).toLocaleString('es-CO',{maximumFractionDigits:2})}${x.usd.aprox?', aproximada: revísala':''}) · afuera el envío va dentro del precio</div>`;
 // Sheets convierte «6/10» en fecha y el servidor la manda como «Tue Oct 06 2026 00:00:00 GMT-0500…»: se muestra «6/10/2026».
 const obsTxt = v => { const m=String(v||'').match(/^\w{3} (\w{3}) (\d{2}) (\d{4}) \d{2}:\d{2}:\d{2} GMT/); if(!m) return String(v||''); const k=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'].indexOf(m[1]); return k<0?String(v):`${parseInt(m[2])}/${k+1}/${m[3]}`; };
 // Plural de persona, no «pedido(s)» (Andreu, 2026-11-26).
@@ -1191,8 +1195,9 @@ function pintarCostos(){
       <div style="flex:1;min-width:0">
         <div class="pprod">${esc(x.producto)}${x.falta?'<span class="chip chip-pend">sin costo</span>':''}${x.envioIA?'<span class="chip chip-ia">envío que puso la IA</span>':''}${x.importacion?'<span class="chip chip-pacho">importación</span>':''}</div>
         <div class="pmeta">${esc(x.persona||'—')} · ${esc(x.ciudad||'sin ciudad')} · ${fFecha(x.fecha)} · #${esc(x.id)}</div>
+        ${ventaUsdLinea(x)}
       </div>
-      <div class="pmoney"><b>${cop(x.venta)}</b>vendido</div>
+      <div class="pmoney"><b>${ventaB(x)}</b>vendido</div>
     </div>
     <div class="pctrl">
       <div class="fila">
@@ -1425,8 +1430,9 @@ function pintarRegistro(){
         <div class="pprod">${esc(x.producto)}${dev?'<span class="chip chip-pend">devolución</span>':''}${x.importacion?'<span class="chip chip-pacho">importación</span>':''}</div>
         <div class="pmeta">${esc(x.nombre||'—')} · ${esc(x.cel||'sin celular')} · ${esc(x.ciudad||'sin ciudad')} · ${fFecha(x.fecha)} · #${esc(x.id)}</div>
         <div class="pmeta">${esc(x.medioPago||'sin medio de pago')}${x.notas?' · '+esc(x.notas):''}${(()=>{ const c=ROL==='jp'&&regCosto(x); return !c?'':c.falta?' · <span class="chip chip-pend">sin costo</span>':c.envioIA?' · <span class="chip chip-ia">envío que puso la IA</span>':''; })()}</div>
+        ${ventaUsdLinea(x)}
       </div>
-      <div class="pmoney"><b>${cop(x.venta)}</b>vendido</div>
+      <div class="pmoney"><b>${ventaB(x)}</b>vendido</div>
     </div>
     ${regAbierta===x.id?regForm(x,i,dev):`<div class="bt"><button class="btn-fs" onclick="regAbrir(${i})">Corregir</button>${x.archivada?'<span class="pmeta">Archivada: solo se corrige</span>':`${dev?'':`<button class="btn-fs" onclick="regDevolucion(${i})">Marcar devolución</button>`}<button class="btn-fs" onclick="regEliminar(${i})">Eliminar</button>`}</div>`}
   </div>`;}).join('')+(l.length>150?`<div class="vacio">Hay ${l.length-150} más: búscala por nombre, celular o #.</div>`:'');
@@ -1476,7 +1482,7 @@ function regDevolucion(i){
 }
 async function regEliminar(i){
   const x=ventasReg[i]; if(!x) return;
-  if(!confirm(`¿ELIMINAR la venta #${x.id} de ${x.nombre||'este cliente'} por ${cop(x.venta)}?\n\nEs para una venta que no fue (registrada por error o repetida). Si el cliente la devolvió, usa «Marcar devolución».`)) return;
+  if(!confirm(`¿ELIMINAR la venta #${x.id} de ${x.nombre||'este cliente'} por ${ventaB(x)}?\n\nEs para una venta que no fue (registrada por error o repetida). Si el cliente la devolvió, usa «Marcar devolución».`)) return;
   toast('Eliminando...');
   try{
     const r=await post({action:'venta_eliminar',id:x.id});
